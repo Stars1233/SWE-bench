@@ -26077,7 +26077,8 @@ If the environment script list changes, the image will be rebuilt automatically.
 <span class="normal">164</span>
 <span class="normal">165</span>
 <span class="normal">166</span>
-<span class="normal">167</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">load_swebench_dataset</span><span class="p">(</span>
+<span class="normal">167</span>
+<span class="normal">168</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">load_swebench_dataset</span><span class="p">(</span>
     <span class="n">name</span><span class="o">=</span><span class="s2">&quot;princeton-nlp/SWE-bench&quot;</span><span class="p">,</span> <span class="n">split</span><span class="o">=</span><span class="s2">&quot;test&quot;</span><span class="p">,</span> <span class="n">instance_ids</span><span class="o">=</span><span class="kc">None</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">SWEbenchInstance</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
@@ -26087,9 +26088,10 @@ If the environment script list changes, the image will be rebuilt automatically.
     <span class="k">if</span> <span class="n">instance_ids</span><span class="p">:</span>
         <span class="n">instance_ids</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">instance_ids</span><span class="p">)</span>
     <span class="c1"># Load from local .json/.jsonl file</span>
-    <span class="k">if</span> <span class="n">name</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.json&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">name</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.jsonl&quot;</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">name</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.json&quot;</span><span class="p">):</span>
         <span class="n">dataset</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">name</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
-        <span class="n">dataset_ids</span> <span class="o">=</span> <span class="p">{</span><span class="n">instance</span><span class="p">[</span><span class="n">KEY_INSTANCE_ID</span><span class="p">]</span> <span class="k">for</span> <span class="n">instance</span> <span class="ow">in</span> <span class="n">dataset</span><span class="p">}</span>
+    <span class="k">elif</span> <span class="n">name</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.jsonl&quot;</span><span class="p">):</span>
+        <span class="n">dataset</span> <span class="o">=</span> <span class="p">[</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">line</span><span class="p">)</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">Path</span><span class="p">(</span><span class="n">name</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">()</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()]</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="c1"># Load from Hugging Face Datasets</span>
         <span class="k">if</span> <span class="n">name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;swe-bench&quot;</span><span class="p">,</span> <span class="s2">&quot;swebench&quot;</span><span class="p">,</span> <span class="s2">&quot;swe_bench&quot;</span><span class="p">}:</span>
@@ -26106,7 +26108,7 @@ If the environment script list changes, the image will be rebuilt automatically.
             <span class="n">dataset</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">Dataset</span><span class="p">,</span> <span class="n">load_from_disk</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="o">/</span> <span class="n">split</span><span class="p">))</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">dataset</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="n">Dataset</span><span class="p">,</span> <span class="n">load_dataset</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">split</span><span class="o">=</span><span class="n">split</span><span class="p">))</span>
-        <span class="n">dataset_ids</span> <span class="o">=</span> <span class="p">{</span><span class="n">instance</span><span class="p">[</span><span class="n">KEY_INSTANCE_ID</span><span class="p">]</span> <span class="k">for</span> <span class="n">instance</span> <span class="ow">in</span> <span class="n">dataset</span><span class="p">}</span>
+    <span class="n">dataset_ids</span> <span class="o">=</span> <span class="p">{</span><span class="n">instance</span><span class="p">[</span><span class="n">KEY_INSTANCE_ID</span><span class="p">]</span> <span class="k">for</span> <span class="n">instance</span> <span class="ow">in</span> <span class="n">dataset</span><span class="p">}</span>
     <span class="k">if</span> <span class="n">instance_ids</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">instance_ids</span> <span class="o">-</span> <span class="n">dataset_ids</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
@@ -26145,11 +26147,11 @@ If the environment script list changes, the image will be rebuilt automatically.
 
             <details class="quote">
               <summary>Source code in <code>swebench/harness/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">182</span>
-<span class="normal">183</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">183</span>
 <span class="normal">184</span>
 <span class="normal">185</span>
-<span class="normal">186</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_first_idx</span><span class="p">(</span><span class="n">charlist</span><span class="p">):</span>
+<span class="normal">186</span>
+<span class="normal">187</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_first_idx</span><span class="p">(</span><span class="n">charlist</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Get index of first occurrence of &quot;-&quot; or &quot;+&quot; in charlist&quot;&quot;&quot;</span>
     <span class="n">first_min</span> <span class="o">=</span> <span class="n">charlist</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="s2">&quot;-&quot;</span> <span class="ow">in</span> <span class="n">charlist</span> <span class="k">else</span> <span class="nb">len</span><span class="p">(</span><span class="n">charlist</span><span class="p">)</span>
     <span class="n">first_plus</span> <span class="o">=</span> <span class="n">charlist</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="s2">&quot;+&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="s2">&quot;+&quot;</span> <span class="ow">in</span> <span class="n">charlist</span> <span class="k">else</span> <span class="nb">len</span><span class="p">(</span><span class="n">charlist</span><span class="p">)</span>
@@ -26178,11 +26180,11 @@ If the environment script list changes, the image will be rebuilt automatically.
 
             <details class="quote">
               <summary>Source code in <code>swebench/harness/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">189</span>
-<span class="normal">190</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">190</span>
 <span class="normal">191</span>
 <span class="normal">192</span>
-<span class="normal">193</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_last_idx</span><span class="p">(</span><span class="n">charlist</span><span class="p">):</span>
+<span class="normal">193</span>
+<span class="normal">194</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_last_idx</span><span class="p">(</span><span class="n">charlist</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Get index of last occurrence of &quot;-&quot; or &quot;+&quot; in charlist&quot;&quot;&quot;</span>
     <span class="n">char_idx</span> <span class="o">=</span> <span class="n">get_first_idx</span><span class="p">(</span><span class="n">charlist</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
     <span class="n">last_idx</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">charlist</span><span class="p">)</span> <span class="o">-</span> <span class="n">char_idx</span>
@@ -26211,8 +26213,7 @@ If the environment script list changes, the image will be rebuilt automatically.
 
             <details class="quote">
               <summary>Source code in <code>swebench/harness/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">196</span>
-<span class="normal">197</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">197</span>
 <span class="normal">198</span>
 <span class="normal">199</span>
 <span class="normal">200</span>
@@ -26220,7 +26221,8 @@ If the environment script list changes, the image will be rebuilt automatically.
 <span class="normal">202</span>
 <span class="normal">203</span>
 <span class="normal">204</span>
-<span class="normal">205</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">strip_content</span><span class="p">(</span><span class="n">hunk</span><span class="p">):</span>
+<span class="normal">205</span>
+<span class="normal">206</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">strip_content</span><span class="p">(</span><span class="n">hunk</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Remove trailing non +/- lines and trailing whitespace per line per hunk&quot;&quot;&quot;</span>
     <span class="n">first_chars</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="kc">None</span> <span class="k">if</span> <span class="ow">not</span> <span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">else</span> <span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">hunk</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)))</span>
     <span class="n">first_idx</span> <span class="o">=</span> <span class="n">get_first_idx</span><span class="p">(</span><span class="n">first_chars</span><span class="p">)</span>
@@ -26254,8 +26256,7 @@ If the environment script list changes, the image will be rebuilt automatically.
 
             <details class="quote">
               <summary>Source code in <code>swebench/harness/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">208</span>
-<span class="normal">209</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">209</span>
 <span class="normal">210</span>
 <span class="normal">211</span>
 <span class="normal">212</span>
@@ -26272,7 +26273,8 @@ If the environment script list changes, the image will be rebuilt automatically.
 <span class="normal">223</span>
 <span class="normal">224</span>
 <span class="normal">225</span>
-<span class="normal">226</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_hunk_stats</span><span class="p">(</span><span class="n">pre_start</span><span class="p">,</span> <span class="n">pre_len</span><span class="p">,</span> <span class="n">post_start</span><span class="p">,</span> <span class="n">post_len</span><span class="p">,</span> <span class="n">hunk</span><span class="p">,</span> <span class="n">total_delta</span><span class="p">):</span>
+<span class="normal">226</span>
+<span class="normal">227</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_hunk_stats</span><span class="p">(</span><span class="n">pre_start</span><span class="p">,</span> <span class="n">pre_len</span><span class="p">,</span> <span class="n">post_start</span><span class="p">,</span> <span class="n">post_len</span><span class="p">,</span> <span class="n">hunk</span><span class="p">,</span> <span class="n">total_delta</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Recalculate hunk start/end position and diff delta&quot;&quot;&quot;</span>
     <span class="n">stats</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;context&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;added&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;subtracted&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">}</span>
     <span class="n">hunk</span> <span class="o">=</span> <span class="n">hunk</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -26318,8 +26320,7 @@ If the environment script list changes, the image will be rebuilt automatically.
 
             <details class="quote">
               <summary>Source code in <code>swebench/harness/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">229</span>
-<span class="normal">230</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">230</span>
 <span class="normal">231</span>
 <span class="normal">232</span>
 <span class="normal">233</span>
@@ -26345,7 +26346,8 @@ If the environment script list changes, the image will be rebuilt automatically.
 <span class="normal">253</span>
 <span class="normal">254</span>
 <span class="normal">255</span>
-<span class="normal">256</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">extract_minimal_patch</span><span class="p">(</span><span class="n">model_patch</span><span class="p">):</span>
+<span class="normal">256</span>
+<span class="normal">257</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">extract_minimal_patch</span><span class="p">(</span><span class="n">model_patch</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Wrapper function that takes hunk and</span>
 <span class="sd">    * Removes trailing non +/- lines and trailing whitespace per line per hunk</span>
@@ -26428,8 +26430,7 @@ If the environment script list changes, the image will be rebuilt automatically.
 
             <details class="quote">
               <summary>Source code in <code>swebench/harness/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">259</span>
-<span class="normal">260</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">260</span>
 <span class="normal">261</span>
 <span class="normal">262</span>
 <span class="normal">263</span>
@@ -26456,7 +26457,8 @@ If the environment script list changes, the image will be rebuilt automatically.
 <span class="normal">284</span>
 <span class="normal">285</span>
 <span class="normal">286</span>
-<span class="normal">287</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">has_attribute_or_import_error</span><span class="p">(</span><span class="n">log_before</span><span class="p">):</span>
+<span class="normal">287</span>
+<span class="normal">288</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">has_attribute_or_import_error</span><span class="p">(</span><span class="n">log_before</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Check to see if Attribute/Import-prefix is in log text</span>
 
@@ -26509,8 +26511,7 @@ If the environment script list changes, the image will be rebuilt automatically.
 
             <details class="quote">
               <summary>Source code in <code>swebench/harness/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">290</span>
-<span class="normal">291</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">291</span>
 <span class="normal">292</span>
 <span class="normal">293</span>
 <span class="normal">294</span>
@@ -26520,7 +26521,8 @@ If the environment script list changes, the image will be rebuilt automatically.
 <span class="normal">298</span>
 <span class="normal">299</span>
 <span class="normal">300</span>
-<span class="normal">301</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">str2bool</span><span class="p">(</span><span class="n">v</span><span class="p">):</span>
+<span class="normal">301</span>
+<span class="normal">302</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">str2bool</span><span class="p">(</span><span class="n">v</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Minor helper function to convert string to boolean</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -26554,15 +26556,15 @@ If the environment script list changes, the image will be rebuilt automatically.
 
             <details class="quote">
               <summary>Source code in <code>swebench/harness/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">304</span>
-<span class="normal">305</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">305</span>
 <span class="normal">306</span>
 <span class="normal">307</span>
 <span class="normal">308</span>
 <span class="normal">309</span>
 <span class="normal">310</span>
 <span class="normal">311</span>
-<span class="normal">312</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_repo_file</span><span class="p">(</span><span class="n">repo</span><span class="p">,</span> <span class="n">commit</span><span class="p">,</span> <span class="n">filepath</span><span class="p">):</span>
+<span class="normal">312</span>
+<span class="normal">313</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_repo_file</span><span class="p">(</span><span class="n">repo</span><span class="p">,</span> <span class="n">commit</span><span class="p">,</span> <span class="n">filepath</span><span class="p">):</span>
     <span class="n">url</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;https://raw.githubusercontent.com/</span><span class="si">{</span><span class="n">repo</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">commit</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">filepath</span><span class="si">}</span><span class="s2">&quot;</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
@@ -26595,8 +26597,7 @@ If the environment script list changes, the image will be rebuilt automatically.
 
             <details class="quote">
               <summary>Source code in <code>swebench/harness/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">315</span>
-<span class="normal">316</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">316</span>
 <span class="normal">317</span>
 <span class="normal">318</span>
 <span class="normal">319</span>
@@ -26604,7 +26605,8 @@ If the environment script list changes, the image will be rebuilt automatically.
 <span class="normal">321</span>
 <span class="normal">322</span>
 <span class="normal">323</span>
-<span class="normal">324</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_modified_files</span><span class="p">(</span><span class="n">patch</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="normal">324</span>
+<span class="normal">325</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_modified_files</span><span class="p">(</span><span class="n">patch</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Get the list of modified files in a patch</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -26638,11 +26640,11 @@ If the environment script list changes, the image will be rebuilt automatically.
 
             <details class="quote">
               <summary>Source code in <code>swebench/harness/utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">327</span>
-<span class="normal">328</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">328</span>
 <span class="normal">329</span>
 <span class="normal">330</span>
-<span class="normal">331</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ansi_escape</span><span class="p">(</span><span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">331</span>
+<span class="normal">332</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">ansi_escape</span><span class="p">(</span><span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Remove ANSI escape sequences from text</span>
 <span class="sd">    &quot;&quot;&quot;</span>
