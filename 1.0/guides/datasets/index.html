@@ -1138,6 +1138,12 @@
 <td>100 dev instances (500 test)</td>
 <td>Testing multimodal capabilities</td>
 </tr>
+<tr>
+<td><strong>SWE-bench Multilingual</strong></td>
+<td>9 programming languages, 42 repositories</td>
+<td>300 instances</td>
+<td>Cross-lingual evaluation</td>
+</tr>
 </tbody>
 </table>
 <h2 id="accessing-datasets">Accessing Datasets</h2>
@@ -1145,17 +1151,20 @@
 <div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">datasets</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_dataset</span>
 
 <span class="c1"># Load main dataset</span>
-<span class="n">sbf</span> <span class="o">=</span> <span class="n">load_dataset</span><span class="p">(</span><span class="s1">&#39;princeton-nlp/SWE-bench&#39;</span><span class="p">)</span>
+<span class="n">sbf</span> <span class="o">=</span> <span class="n">load_dataset</span><span class="p">(</span><span class="s1">&#39;SWE-bench/SWE-bench&#39;</span><span class="p">)</span>
 
 <span class="c1"># Load lite variant</span>
-<span class="n">sbl</span> <span class="o">=</span> <span class="n">load_dataset</span><span class="p">(</span><span class="s1">&#39;princeton-nlp/SWE-bench_Lite&#39;</span><span class="p">)</span>
+<span class="n">sbl</span> <span class="o">=</span> <span class="n">load_dataset</span><span class="p">(</span><span class="s1">&#39;SWE-bench/SWE-bench_Lite&#39;</span><span class="p">)</span>
 
 <span class="c1"># Load verified variant</span>
-<span class="n">sbv</span> <span class="o">=</span> <span class="n">load_dataset</span><span class="p">(</span><span class="s1">&#39;princeton-nlp/SWE-bench_Verified&#39;</span><span class="p">,</span> <span class="n">split</span><span class="o">=</span><span class="s1">&#39;test&#39;</span><span class="p">)</span>
+<span class="n">sbv</span> <span class="o">=</span> <span class="n">load_dataset</span><span class="p">(</span><span class="s1">&#39;SWE-bench/SWE-bench_Verified&#39;</span><span class="p">,</span> <span class="n">split</span><span class="o">=</span><span class="s1">&#39;test&#39;</span><span class="p">)</span>
 
 <span class="c1"># Load multimodal variant</span>
-<span class="n">sbm_dev</span> <span class="o">=</span> <span class="n">load_dataset</span><span class="p">(</span><span class="s1">&#39;princeton-nlp/SWE-bench_Multimodal&#39;</span><span class="p">,</span> <span class="n">split</span><span class="o">=</span><span class="s1">&#39;dev&#39;</span><span class="p">)</span>
-<span class="n">sbm_test</span> <span class="o">=</span> <span class="n">load_dataset</span><span class="p">(</span><span class="s1">&#39;princeton-nlp/SWE-bench_Multimodal&#39;</span><span class="p">,</span> <span class="n">split</span><span class="o">=</span><span class="s1">&#39;test&#39;</span><span class="p">)</span>
+<span class="n">sbm_dev</span> <span class="o">=</span> <span class="n">load_dataset</span><span class="p">(</span><span class="s1">&#39;SWE-bench/SWE-bench_Multimodal&#39;</span><span class="p">,</span> <span class="n">split</span><span class="o">=</span><span class="s1">&#39;dev&#39;</span><span class="p">)</span>
+<span class="n">sbm_test</span> <span class="o">=</span> <span class="n">load_dataset</span><span class="p">(</span><span class="s1">&#39;SWE-bench/SWE-bench_Multimodal&#39;</span><span class="p">,</span> <span class="n">split</span><span class="o">=</span><span class="s1">&#39;test&#39;</span><span class="p">)</span>
+
+<span class="c1"># Load multilingual variant</span>
+<span class="n">sbml</span> <span class="o">=</span> <span class="n">load_dataset</span><span class="p">(</span><span class="s1">&#39;SWE-bench/SWE-bench_Multilingual&#39;</span><span class="p">,</span> <span class="n">split</span><span class="o">=</span><span class="s1">&#39;test&#39;</span><span class="p">)</span>
 </code></pre></div>
 <h2 id="dataset-structure">Dataset Structure</h2>
 <p>Each instance in the datasets has the following structure:</p>

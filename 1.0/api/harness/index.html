@@ -28219,8 +28219,7 @@ This function selects the appropriate log parser based on the instance id.</p>
 
             <details class="quote">
               <summary>Source code in <code>swebench/harness/modal_eval/run_evaluation_modal.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">389</span>
-<span class="normal">390</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">390</span>
 <span class="normal">391</span>
 <span class="normal">392</span>
 <span class="normal">393</span>
@@ -28284,7 +28283,8 @@ This function selects the appropriate log parser based on the instance id.</p>
 <span class="normal">451</span>
 <span class="normal">452</span>
 <span class="normal">453</span>
-<span class="normal">454</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">run_instances_modal</span><span class="p">(</span>
+<span class="normal">454</span>
+<span class="normal">455</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">run_instances_modal</span><span class="p">(</span>
     <span class="n">predictions</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
     <span class="n">instances</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span>
     <span class="n">full_dataset</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span>
@@ -29526,13 +29526,15 @@ Raises an exception if credentials are not configured.</p>
 <span class="normal">383</span>
 <span class="normal">384</span>
 <span class="normal">385</span>
-<span class="normal">386</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@app</span><span class="o">.</span><span class="n">function</span><span class="p">(</span>
+<span class="normal">386</span>
+<span class="normal">387</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@app</span><span class="o">.</span><span class="n">function</span><span class="p">(</span>
     <span class="n">image</span><span class="o">=</span><span class="n">swebench_image</span><span class="o">.</span><span class="n">add_local_file</span><span class="p">(</span>
         <span class="n">LOCAL_SANDBOX_ENTRYPOINT_PATH</span><span class="p">,</span>
         <span class="n">REMOTE_SANDBOX_ENTRYPOINT_PATH</span><span class="p">,</span>
     <span class="p">),</span>
     <span class="n">timeout</span><span class="o">=</span><span class="mi">120</span>
     <span class="o">*</span> <span class="mi">60</span><span class="p">,</span>  <span class="c1"># Much larger than default timeout to account for image build time</span>
+    <span class="n">include_source</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">run_instance_modal</span><span class="p">(</span>
     <span class="n">test_spec</span><span class="p">:</span> <span class="n">TestSpec</span><span class="p">,</span>
@@ -29796,8 +29798,7 @@ Raises an exception if credentials are not configured.</p>
 
             <details class="quote">
               <summary>Source code in <code>swebench/harness/modal_eval/run_evaluation_modal.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">389</span>
-<span class="normal">390</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">390</span>
 <span class="normal">391</span>
 <span class="normal">392</span>
 <span class="normal">393</span>
@@ -29861,7 +29862,8 @@ Raises an exception if credentials are not configured.</p>
 <span class="normal">451</span>
 <span class="normal">452</span>
 <span class="normal">453</span>
-<span class="normal">454</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">run_instances_modal</span><span class="p">(</span>
+<span class="normal">454</span>
+<span class="normal">455</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">run_instances_modal</span><span class="p">(</span>
     <span class="n">predictions</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
     <span class="n">instances</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span>
     <span class="n">full_dataset</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span>

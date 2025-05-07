@@ -1435,11 +1435,14 @@
 <h3 id="what-is-swe-bench">What is SWE-bench?</h3>
 <p>SWE-bench is a benchmark for evaluating large language models on real-world software engineering tasks. It consists of GitHub issues and their corresponding fixes, allowing LLMs to be evaluated on their ability to generate patches that resolve these issues.</p>
 <h3 id="which-datasets-are-available">Which datasets are available?</h3>
-<p>SWE-bench offers four main datasets:
-- <strong>SWE-bench</strong>: The full benchmark with 2,294 instances
-- <strong>SWE-bench Lite</strong>: A smaller subset with 534 instances
-- <strong>SWE-bench Verified</strong>: 500 instances verified by engineers as solvable
-- <strong>SWE-bench Multimodal</strong>: 100 <em>development</em> instances with screenshots and UI elements (test eval is on <a href="https://www.swe-bench.com/sb-cli">the SWE-bench API</a>.)</p>
+<p>SWE-bench offers five main datasets:</p>
+<ul>
+<li><strong>SWE-bench</strong>: The full benchmark with 2,294 instances</li>
+<li><strong>SWE-bench Lite</strong>: A smaller subset with 300 instances</li>
+<li><strong>SWE-bench Verified</strong>: 500 instances verified by engineers as solvable</li>
+<li><strong>SWE-bench Multimodal</strong>: 100 <em>development</em> instances with screenshots and UI elements (test eval is on <a href="https://www.swe-bench.com/sb-cli">the SWE-bench API</a>.)</li>
+<li><strong>SWE-bench Multilingual</strong>: 300 instances spanning 9 languages and 42 repositories</li>
+</ul>
 <h3 id="how-does-the-evaluation-work">How does the evaluation work?</h3>
 <p>The evaluation process:
 1. Sets up a Docker environment for a repository
