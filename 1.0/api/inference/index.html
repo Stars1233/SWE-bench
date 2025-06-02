@@ -12479,12 +12479,11 @@ num_key_value_heads, seqlen, head_dim) to (batch, num_attention_heads, seqlen, h
 <span class="normal">54</span>
 <span class="normal">55</span>
 <span class="normal">56</span>
-<span class="normal">57</span>
-<span class="normal">58</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">dataset_name_or_path</span><span class="p">,</span> <span class="n">split</span><span class="p">):</span>
+<span class="normal">57</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">dataset_name_or_path</span><span class="p">,</span> <span class="n">split</span><span class="p">):</span>
     <span class="k">try</span><span class="p">:</span>
-        <span class="n">dataset</span> <span class="o">=</span> <span class="n">load_dataset</span><span class="p">(</span><span class="n">dataset_name_or_path</span><span class="p">,</span> <span class="n">split</span><span class="o">=</span><span class="n">split</span><span class="p">)</span>
+        <span class="n">dataset</span> <span class="o">=</span> <span class="n">load_from_disk</span><span class="p">(</span><span class="n">dataset_name_or_path</span><span class="p">)[</span><span class="n">split</span><span class="p">]</span>
     <span class="k">except</span><span class="p">:</span>
-        <span class="n">dataset</span> <span class="o">=</span> <span class="n">load_from_disk</span><span class="p">(</span><span class="n">dataset_name_or_path</span><span class="p">,</span> <span class="n">split</span><span class="o">=</span><span class="n">split</span><span class="p">)</span>
+        <span class="n">dataset</span> <span class="o">=</span> <span class="n">load_dataset</span><span class="p">(</span><span class="n">dataset_name_or_path</span><span class="p">,</span> <span class="n">split</span><span class="o">=</span><span class="n">split</span><span class="p">)</span>
     <span class="nb">print</span><span class="p">(</span>
         <span class="sa">f</span><span class="s2">&quot;Evaluating </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span><span class="si">}</span><span class="s2"> instances from </span><span class="si">{</span><span class="n">dataset_name_or_path</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">split</span><span class="si">}</span><span class="s2"> split&quot;</span>
     <span class="p">)</span>
@@ -12500,9 +12499,7 @@ num_key_value_heads, seqlen, head_dim) to (batch, num_attention_heads, seqlen, h
         <span class="n">instance_id</span> <span class="o">=</span> <span class="n">datum</span><span class="p">[</span><span class="s2">&quot;instance_id&quot;</span><span class="p">]</span>
         <span class="n">retrieved_files</span> <span class="o">=</span> <span class="n">instance_files_pattern</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="n">datum</span><span class="p">[</span><span class="s2">&quot;text&quot;</span><span class="p">])</span>
         <span class="k">if</span> <span class="n">retrieved_files</span> <span class="ow">and</span> <span class="s2">&quot;readme&quot;</span> <span class="ow">in</span> <span class="n">retrieved_files</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">lower</span><span class="p">():</span>
-            <span class="n">retrieved_files</span> <span class="o">=</span> <span class="n">retrieved_files</span><span class="p">[</span>
-                <span class="mi">1</span><span class="p">:</span>
-            <span class="p">]</span>  <span class="c1"># first file is usually the readme, we don&#39;t want to count that</span>
+            <span class="n">retrieved_files</span> <span class="o">=</span> <span class="n">retrieved_files</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
         <span class="n">retrieved_files</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">retrieved_files</span><span class="p">)</span>
         <span class="n">gold_files</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">patch_files_pattern</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="n">patch_files</span><span class="p">[</span><span class="n">instance_id</span><span class="p">]))</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">gold_files</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
@@ -12510,8 +12507,9 @@ num_key_value_heads, seqlen, head_dim) to (batch, num_attention_heads, seqlen, h
             <span class="k">continue</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">retrieved_files</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;WARNING: Instance </span><span class="si">{</span><span class="n">datum</span><span class="p">[</span><span class="s1">&#39;instance_id&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> has no retrieved files&quot;</span><span class="p">)</span>
-            <span class="k">continue</span>
-        <span class="n">recall</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">retrieved_files</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">gold_files</span><span class="p">))</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">gold_files</span><span class="p">)</span>
+            <span class="n">recall</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">recall</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">retrieved_files</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">gold_files</span><span class="p">))</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">gold_files</span><span class="p">)</span>
         <span class="n">recalls</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">recall</span><span class="p">)</span>
         <span class="n">recalls_any</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">recall</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">))</span>
         <span class="n">recalls_all</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">recall</span> <span class="o">==</span> <span class="mi">1</span><span class="p">))</span>
