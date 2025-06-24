@@ -1381,28 +1381,31 @@
 </code></pre></div>
 <h3 id="cloud-based-evaluation">Cloud-based Evaluation</h3>
 <p>The harness supports cloud-based evaluations using Modal:</p>
-<div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">swebench.harness.modal_eval.run_modal</span><span class="w"> </span><span class="kn">import</span> <span class="n">run_modal_evaluation</span>
-
-<span class="c1"># Run evaluation in the cloud</span>
-<span class="n">results</span> <span class="o">=</span> <span class="n">run_modal_evaluation</span><span class="p">(</span>
-    <span class="n">predictions</span><span class="o">=</span><span class="n">predictions</span><span class="p">,</span>
-    <span class="n">dataset_name</span><span class="o">=</span><span class="s2">&quot;SWE-bench_Lite&quot;</span><span class="p">,</span>
-    <span class="n">parallelism</span><span class="o">=</span><span class="mi">10</span>
-<span class="p">)</span>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>swebench.harness.run_evaluation<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--predictions_path<span class="w"> </span>gold<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--max_workers<span class="w"> </span><span class="m">1</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--instance_ids<span class="w"> </span>sympy__sympy-20590<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--run_id<span class="w"> </span>validate-gold
+<span class="w">    </span>--modal<span class="w"> </span><span class="nb">true</span>
 </code></pre></div>
 <p>You can also use <a href="https://github.com/swe-bench/sb-cli">sb-cli</a>, a tool for running evaluations automatically on AWS.</p>
 <h2 id="parameters">Parameters</h2>
 <p>The harness accepts various parameters to configure the evaluation:</p>
 <ul>
 <li><code>--dataset_name</code>: The name of the dataset to evaluate on</li>
+<li><code>--split</code>: Split of the dataset</li>
 <li><code>--predictions_path</code>: Path to the predictions file (or "gold" for ground truth)</li>
 <li><code>--max_workers</code>: Number of parallel evaluation workers</li>
 <li><code>--run_id</code>: Identifier for the evaluation run</li>
 <li><code>--cache_level</code>: Level of caching for Docker images</li>
 <li><code>--clean</code>: Whether to clean up resources after evaluation</li>
 <li><code>--instance_ids</code>: Specific instances to evaluate (comma-separated)</li>
+<li><code>--open_file_limit</code>: Open file limit</li>
+<li><code>--force_rebuild</code>: Force rebuild all images</li>
 <li><code>--log_level</code>: Logging verbosity</li>
+<li><code>--namespace</code>: Namespace for images</li>
 <li><code>--timeout</code>: Maximum time (seconds) for evaluating each instance</li>
+<li><code>--modal</code>: If true, run on Modal</li>
 </ul>
 <p>For a complete list of arguments, run:
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>swebench.harness.run_evaluation<span class="w"> </span>--help

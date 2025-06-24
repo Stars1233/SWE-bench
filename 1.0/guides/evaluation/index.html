@@ -1346,10 +1346,11 @@ pip<span class="w"> </span>install<span class="w"> </span>modal<span class="w"> 
 modal<span class="w"> </span>setup
 
 <span class="c1"># Run evaluation on Modal</span>
-python<span class="w"> </span>-m<span class="w"> </span>swebench.harness.modal_eval.run_modal<span class="w"> </span><span class="se">\</span>
+python<span class="w"> </span>-m<span class="w"> </span>swebench.harness.run_evaluation<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--dataset_name<span class="w"> </span>princeton-nlp/SWE-bench_Lite<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--predictions_path<span class="w"> </span>&lt;path_to_predictions&gt;<span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>--parallelism<span class="w"> </span><span class="m">10</span>
+<span class="w">    </span>--parallelism<span class="w"> </span><span class="m">10</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--modal<span class="w"> </span><span class="nb">true</span>
 </code></pre></div>
 <h3 id="running-with-sb-cli">Running with sb-cli</h3>
 <p>For a simpler cloud evaluation experience, you can use the <a href="https://github.com/swe-bench/sb-cli">sb-cli</a> tool:</p>
