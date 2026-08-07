@@ -25,7 +25,7 @@ dependencies = [
     "chardet",
     "datasets",
     "docker",
-    "ghapi",
+    "ghapi<2",  # 2.x is async: every call returns a coroutine
     "GitPython",
     "modal",
     "pre-commit",
