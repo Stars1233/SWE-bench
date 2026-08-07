@@ -1,4 +1,4 @@
-site_name: SWE-bench documentation
+site_name: SWE-bench
 site_url: https://swe-bench.com
 theme:
   name: material
@@ -52,31 +52,30 @@ markdown_extensions:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
 nav:
-  - "Getting Started":
+  - "Leaderboard": https://swebench.com
+  - "SWE-bench":
     - "Overview": index.md
     - "Installation": installation.md
     - "FAQ": faq.md
   - "User Guides":
-    - "Quickstart": guides/quickstart.md
+    - "SWE-bench Quickstart": guides/quickstart.md
     - "Evaluation": guides/evaluation.md
     - "Docker Setup": guides/docker_setup.md
     - "Datasets": guides/datasets.md
     - "Create RAG Datasets": guides/create_rag_datasets.md
-  - "Reference":
-    - "The Harness": reference/harness.md
-    - "Inference": reference/inference.md
-    - "Versioning": reference/versioning.md
-  - "API":
-    - "Harness": api/harness.md
-    - "Inference": api/inference.md
-    - "Versioning": api/versioning.md
+    - "Reference":
+      - "The Harness": reference/harness.md
+      - "Inference": reference/inference.md
+      - "Versioning": reference/versioning.md
+    - "API":
+      - "Harness": api/harness.md
+      - "Inference": api/inference.md
+      - "Versioning": api/versioning.md
 plugins:
+   - blog
    - glightbox
    - search
    - include-markdown
-   - mike:
-      canonical_version: latest
-      version_selector: true
    - mkdocstrings:
       default_handler: python
       handlers:
@@ -101,8 +100,6 @@ extra_css:
   - css/custom.css
   - css/mkdocstrings.css
 extra:
-  version:
-    provider: mike
   analytics:
     provider: google
     property: G-T5P2NYGJYR

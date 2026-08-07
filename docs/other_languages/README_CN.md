@@ -13,7 +13,7 @@
 
 ---
 <p align="center">
-您可以在我们的ICLR 2024的论文<a href="http://swe-bench.github.io/paper.pdf">《SWE-bench: Can Language Models Resolve Real-World GitHub Issues?》</a>中找到我们的代码和数据
+您可以在我们的ICLR 2024的论文<a href="https://arxiv.org/abs/2310.06770">《SWE-bench: Can Language Models Resolve Real-World GitHub Issues?》</a>中找到我们的代码和数据
     </br>
     </br>
     <a href="https://www.python.org/">
@@ -34,13 +34,13 @@
 查看SWE-bench生态系统中的其他项目！
 <div style="text-align:center">
     <a href="https://swe-agent.com">
-        <img src="../../assets/icons/swe-agent-button.svg" alt="SWE-agent" style="max-height: 5em; border: 2px solid rgb(0, 0, 0); border-radius: 5px; padding: 5px;"/>
+        <img src="https://raw.githubusercontent.com/SWE-agent/swe-agent-media/refs/heads/main/media/logos_banners/sweagent_logo_text_right.svg" alt="SWE-agent" style="max-height: 5em; border: 2px solid rgb(0, 0, 0); border-radius: 5px; padding: 5px;"/>
     </a>
     <a href="https://swe-rex.com">
-        <img src="../../assets/icons/swe-rex-button.svg" alt="SWE-rex" style="max-height: 5em; border: 2px solid rgb(0, 0, 0); border-radius: 5px; padding: 5px;"/>
+        <img src="https://raw.githubusercontent.com/SWE-agent/swe-agent-media/refs/heads/main/media/logos_banners/swerex_button_text_right.svg" alt="SWE-rex" style="max-height: 5em; border: 2px solid rgb(0, 0, 0); border-radius: 5px; padding: 5px;"/>
     </a>
     <a href="https://swebench.com/sb-cli">
-        <img src="../../assets/icons/sb-cli-button.svg" alt="SWE-bench CLI" style="max-height: 5em; border: 2px solid rgb(0, 0, 0); border-radius: 5px; padding: 5px;"/>
+        <img src="https://raw.githubusercontent.com/SWE-agent/swe-agent-media/refs/heads/main/media/logos_banners/sbcli_logo_text_right.svg" alt="SWE-bench CLI" style="max-height: 5em; border: 2px solid rgb(0, 0, 0); border-radius: 5px; padding: 5px;"/>
     </a>
 </div>
 
@@ -81,7 +81,7 @@ python -m swebench.harness.run_evaluation \
 
 ## 💽 使用
 
-> [!警告]
+> [!warning]
 > 在SWE-bench上运行快速评估可能会消耗大量资源
 > 我们建议在一台具有至少120GB可用存储空间、16GB RAM和8个CPU核心的`x86_64`机器上运行评估工具。
 > 你可能需要尝试调整`--max_workers`参数以找到适合你机器的最佳工作进程数,但我们建议使用少于`min(0.75 * os.cpu_count(), 24)`的数值。

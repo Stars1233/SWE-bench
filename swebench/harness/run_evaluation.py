@@ -526,21 +526,26 @@ if __name__ == "__main__":
 
     # Common args
     parser.add_argument(
+        "-d",
         "--dataset_name",
         default="SWE-bench/SWE-bench_Lite",
         type=str,
         help="Name of dataset or path to JSON file.",
     )
     parser.add_argument(
-        "--split", type=str, default="test", help="Split of the dataset"
+        "-s",
+        "--split",
+        type=str, default="test", help="Split of the dataset"
     )
     parser.add_argument(
+        "-i",
         "--instance_ids",
         nargs="+",
         type=str,
         help="Instance IDs to run (space separated)",
     )
     parser.add_argument(
+        "-p",
         "--predictions_path",
         type=str,
         help="Path to predictions file - if 'gold', uses gold predictions",
@@ -558,13 +563,18 @@ if __name__ == "__main__":
         "--open_file_limit", type=int, default=4096, help="Open file limit"
     )
     parser.add_argument(
+        "-t",
         "--timeout",
         type=int,
         default=1_800,
         help="Timeout (in seconds) for running tests for each instance",
     )
     parser.add_argument(
-        "--run_id", type=str, required=True, help="Run ID - identifies the run"
+        "-id",
+        "--run_id",
+        type=str,
+        required=True,
+        help="Run ID - identifies the run"
     )
     parser.add_argument(
         "--rewrite_reports",

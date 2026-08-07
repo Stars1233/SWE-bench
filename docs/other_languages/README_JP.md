@@ -17,7 +17,7 @@
 
 ---
 <p align="center">
-ICLR 2024 の論文 <a href="http://swe-bench.github.io/paper.pdf">SWE-bench: Can Language Models Resolve Real-World GitHub Issues?</a> のコードとデータ
+ICLR 2024 の論文 <a href="https://arxiv.org/abs/2310.06770">SWE-bench: Can Language Models Resolve Real-World GitHub Issues?</a> のコードとデータ
     </br>
     </br>
     <a href="https://www.python.org/">
@@ -35,13 +35,13 @@ ICLR 2024 の論文 <a href="http://swe-bench.github.io/paper.pdf">SWE-bench: Ca
 SWE-benchエコシステムの他のプロジェクトもチェックしてください！
 <div style="text-align:center">
     <a href="https://swe-agent.com">
-        <img src="../../assets/icons/swe-agent-button.svg" alt="SWE-agent" style="max-height: 5em; border: 2px solid rgb(0, 0, 0); border-radius: 5px; padding: 5px;"/>
+        <img src="https://raw.githubusercontent.com/SWE-agent/swe-agent-media/refs/heads/main/media/logos_banners/sweagent_logo_text_right.svg" alt="SWE-agent" style="max-height: 5em; border: 2px solid rgb(0, 0, 0); border-radius: 5px; padding: 5px;"/>
     </a>
     <a href="https://swe-rex.com">
-        <img src="../../assets/icons/swe-rex-button.svg" alt="SWE-rex" style="max-height: 5em; border: 2px solid rgb(0, 0, 0); border-radius: 5px; padding: 5px;"/>
+        <img src="https://raw.githubusercontent.com/SWE-agent/swe-agent-media/refs/heads/main/media/logos_banners/swerex_button_text_right.svg" alt="SWE-rex" style="max-height: 5em; border: 2px solid rgb(0, 0, 0); border-radius: 5px; padding: 5px;"/>
     </a>
     <a href="https://swebench.com/sb-cli">
-        <img src="../../assets/icons/sb-cli-button.svg" alt="SWE-bench CLI" style="max-height: 5em; border: 2px solid rgb(0, 0, 0); border-radius: 5px; padding: 5px;"/>
+        <img src="https://raw.githubusercontent.com/SWE-agent/swe-agent-media/refs/heads/main/media/logos_banners/sbcli_logo_text_right.svg" alt="SWE-bench CLI" style="max-height: 5em; border: 2px solid rgb(0, 0, 0); border-radius: 5px; padding: 5px;"/>
     </a>
 </div>
 
@@ -82,7 +82,7 @@ python -m swebench.harness.run_evaluation \
 
 ## 💽 使用方法
 
-> [!警告]
+> [!warning]
 > SWE-benchでの高速評価の実行はリソース集約的である可能性があります
 > 評価ハーネスは、少なくとも120GBの空き容量、16GBのRAM、8 CPUコアを持つ`x86_64`マシンで実行することをお勧めします。
 > `--max_workers`引数を調整して、マシンに最適なワーカー数を見つける必要があるかもしれませんが、`min(0.75 * os.cpu_count(), 24)`未満を使用することをお勧めします。
