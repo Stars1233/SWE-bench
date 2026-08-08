@@ -154,11 +154,27 @@ MAP_REPO_TO_PARSER_NAME_MULTIMODAL = {
     "mrdoob/three.js": "parse_log_tap",
     "preactjs/preact": "parse_log_karma",
     "axios/axios": "parse_log_tap",
+    # test split
+    "GoogleChrome/lighthouse": "parse_log_lighthouse",
+    "PrismJS/prism": "parse_log_prismjs",
+    "alibaba-fusion/next": "parse_log_next",
+    "bpmn-io/bpmn-js": "parse_log_bpmn_js",
+    "carbon-design-system/carbon": "parse_log_carbon",
+    "eslint/eslint": "parse_log_eslint",
+    "grommet/grommet": "parse_log_grommet",
+    "highlightjs/highlight.js": "parse_log_highlightjs",
+    "openlayers/openlayers": "parse_log_openlayers",
+    "prettier/prettier": "parse_log_carbon",
+    "quarto-dev/quarto-cli": "parse_log_quarto_cli",
+    "scratchfoundation/scratch-gui": "parse_log_carbon",
 }
 FAIL_ONLY_REPOS_MULTIMODAL = {
     "chartjs/Chart.js",
     "processing/p5.js",
     "markedjs/marked",
+    "bpmn-io/bpmn-js",
+    "eslint/eslint",
+    "openlayers/openlayers",
 }
 
 # ---------------------------------------------------------------------------
@@ -314,7 +330,7 @@ def main():
         output_dir=base_output / "SWE-bench_Multimodal",
         label="SWE-bench_Multimodal",
         extra_required_fields={"image_assets"},
-        splits=["dev"],
+        splits=["dev", "test"],
     )
 
     print(f"\n{'='*60}")
