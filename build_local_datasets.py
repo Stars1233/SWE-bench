@@ -6,6 +6,7 @@ Validates that every datum has all required fields with no missing/default value
 """
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -18,10 +19,12 @@ from datasets import load_dataset
 # the three sb_dockerfile_gen packages).
 # ---------------------------------------------------------------------------
 
+# override with SWEBENCH_DOCKERFILE_REPOS=/path/to/checkouts
+_REPO_ROOT = Path(os.environ.get("SWEBENCH_DOCKERFILE_REPOS", Path.home() / "code"))
 DOCKERFILE_REPOS = {
-    "og": Path("/home/ubuntu/code/swe-bench-dockerfiles"),
-    "multilingual": Path("/home/ubuntu/code/swe-bench-multilingual-dockerfiles"),
-    "multimodal": Path("/home/ubuntu/code/swe-bench-multimodal-dockerfiles"),
+    "og": _REPO_ROOT / "swe-bench-dockerfiles",
+    "multilingual": _REPO_ROOT / "swe-bench-multilingual-dockerfiles",
+    "multimodal": _REPO_ROOT / "swe-bench-multimodal-dockerfiles",
 }
 
 # Inline script that loads a generator and produces eval scripts for a batch
@@ -271,7 +274,7 @@ def process_dataset(
 
 
 def main():
-    base_output = Path("/home/ubuntu/code/swe-bench/data")
+    base_output = Path(os.environ.get("SWEBENCH_DATA_DIR", Path(__file__).parent / "data"))
 
     process_dataset(
         hf_name="SWE-bench/SWE-bench",
