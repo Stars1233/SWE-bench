@@ -304,6 +304,17 @@ def main():
     )
 
     process_dataset(
+        hf_name="SWE-bench/SWE-bench_Lite",
+        parser_map=MAP_REPO_TO_PARSER_NAME_OG,
+        fail_only_repos=FAIL_ONLY_REPOS_OG,
+        generator_key="og",
+        output_dir=base_output / "SWE-bench_Lite",
+        label="SWE-bench_Lite",
+        extra_required_fields={"environment_setup_commit"},
+        splits=["dev", "test"],
+    )
+
+    process_dataset(
         hf_name="SWE-bench/SWE-bench_Verified",
         parser_map=MAP_REPO_TO_PARSER_NAME_OG,
         fail_only_repos=FAIL_ONLY_REPOS_OG,

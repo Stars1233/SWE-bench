@@ -142,6 +142,11 @@ def load_swebench_dataset(
         }:
             name = "SWE-bench/SWE-bench_Lite"
         parquet_path = Path(name) / f"{split}.parquet"
+        if not parquet_path.exists():
+            # fall back to the parquets bundled in the repo's data/ directory
+            bundled = Path(__file__).parent.parent.parent / "data" / name.split("/")[-1] / f"{split}.parquet"
+            if bundled.exists():
+                parquet_path = bundled
         if parquet_path.exists():
             dataset = cast(Dataset, load_dataset("parquet", data_files=str(parquet_path), split="train"))
         elif (Path(name) / split / "dataset_info.json").exists():
