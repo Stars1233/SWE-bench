@@ -1,5 +1,7 @@
 # TODO: update this for new structure
 import docker
+
+from swebench.harness.run_evaluation import _docker_client
 import json
 
 from argparse import ArgumentParser
@@ -24,9 +26,9 @@ def main(instance_ids, predictions_path):
         print("No instance IDs provided, exiting.")
         return
 
+    client = _docker_client()
     for instance_id in all_ids:
         try:
-            client = docker.from_env()
             container = client.containers.get(f"sweb.eval.{instance_id}")
             container.stop()
             container.remove()
