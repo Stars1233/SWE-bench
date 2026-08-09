@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import docker
 import json
+import os
 import platform
 import traceback
 
@@ -47,9 +48,20 @@ from swebench.logger import setup_logger, close_logger
 
 GIT_APPLY_CMDS = [
     "git apply --verbose",
+    "git apply --verbose --3way",
     "git apply --verbose --reject",
-    "patch --batch --fuzz=5 -p1 -i",
+    "patch --batch --forward --fuzz=5 -p1 -i",
 ]
+
+DOCKER_CLIENT_TIMEOUT = int(os.environ.get("SWEBENCH_DOCKER_TIMEOUT", "1800"))
+DOCKER_CLIENT_POOL_SIZE = int(os.environ.get("SWEBENCH_DOCKER_POOL_SIZE", "128"))
+
+
+def _docker_client() -> docker.DockerClient:
+    return docker.from_env(
+        timeout=DOCKER_CLIENT_TIMEOUT,
+        max_pool_size=DOCKER_CLIENT_POOL_SIZE,
+    )
 
 
 def create_container(
@@ -194,9 +206,17 @@ def run_instance(
             )
             copy_to_container(container, patch_file, PurePosixPath(CONTAINER_PATCH_FILE))
 
-            # Attempt to apply patch to container (TODO: test this)
+            # Attempt to apply patch to container
             applied_patch = False
-            for git_apply_cmd in GIT_APPLY_CMDS:
+            for attempt, git_apply_cmd in enumerate(GIT_APPLY_CMDS):
+                if attempt:
+                    # a failed attempt (notably --reject) leaves partial state behind,
+                    # which makes every later command fail; restart from a pristine tree
+                    container.exec_run(
+                        ["/bin/bash", "-c", "git checkout -- . ; git clean -fd"],
+                        workdir=CONTAINER_WORKDIR,
+                        user=CONTAINER_USER,
+                    )
                 val = container.exec_run(
                     f"{git_apply_cmd} {CONTAINER_PATCH_FILE}",
                     workdir=CONTAINER_WORKDIR,
@@ -208,6 +228,16 @@ def run_instance(
                     break
                 else:
                     logger.info(f"Failed to apply patch to container: {git_apply_cmd}")
+            if not applied_patch:
+                # the chain can leave the patch fully applied while each command still exited non-zero
+                reverse_check = container.exec_run(
+                    f"git apply --check --reverse {CONTAINER_PATCH_FILE}",
+                    workdir=CONTAINER_WORKDIR,
+                    user=CONTAINER_USER,
+                )
+                if reverse_check.exit_code == 0:
+                    logger.info(f"{APPLY_PATCH_PASS}: verified already applied")
+                    applied_patch = True
             if not applied_patch:
                 logger.info(f"{APPLY_PATCH_FAIL}:\n{val.output.decode('utf-8')}")
                 raise EvaluationError(
@@ -322,7 +352,7 @@ def run_instances(
         timeout (int): Timeout for running tests
         rewrite_reports (bool): True if eval run is just to reformat existing report
     """
-    client = docker.from_env(timeout=1800)
+    client = _docker_client()
     test_specs = [make_test_spec(instance) for instance in instances]
 
     # run instances in parallel
@@ -462,6 +492,12 @@ def main(
     """
     Run evaluation harness for the given dataset and predictions.
     """
+    if dataset_name == "SWE-bench/SWE-bench_Multimodal" and split == "test":
+        print(
+            "ℹ️ Running local evaluation for the test split of SWE-bench Multimodal. "
+            "You may also use sb-cli (https://github.com/swe-bench/sb-cli/) to submit predictions to the hosted evaluation."
+        )
+
     # set open file limit
     assert len(run_id) > 0, "Run ID must be provided"
     if report_dir is not None:
@@ -491,7 +527,7 @@ def main(
     # run instances locally
     if platform.system() == "Linux":
         resource.setrlimit(resource.RLIMIT_NOFILE, (open_file_limit, open_file_limit))
-    client = docker.from_env(timeout=1800)
+    client = _docker_client()
 
     if not dataset:
         print("No instances to run.")
