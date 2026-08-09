@@ -34,7 +34,9 @@ class ImageSpec:
 
     @property
     def name(self):
-        key = f"{self.arch}.{self.instance_id}:{self.tag}"
+        # keep the published naming; amd64 images are tagged x86_64 as they always were
+        arch = "x86_64" if self.arch == "amd64" else self.arch
+        key = f"sweb.eval.{arch}.{self.instance_id}:{self.tag}"
         if self.is_remote_image:
             # docker hub doesn't allow dunders in image names, so we replace them with _1776_
             key = f"{self.namespace}/{key}".replace("__", "_1776_")

@@ -183,7 +183,10 @@ FAIL_ONLY_REPOS_MULTIMODAL = {
 
 
 def get_image_name(instance_id: str) -> str:
-    return f"amd64.{instance_id}:latest".lower()
+    # docker hub disallows dunders in repo names; match image_spec.py's mapping
+    key = f"sweb.eval.x86_64.{instance_id}:latest".lower()
+    namespace = os.environ.get("SWEBENCH_IMAGE_NAMESPACE", "swebench")
+    return f"{namespace}/{key}".replace("__", "_1776_") if namespace else key
 
 
 # ---------------------------------------------------------------------------
