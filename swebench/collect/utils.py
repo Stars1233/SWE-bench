@@ -31,6 +31,19 @@ PR_KEYWORDS = {
 }
 
 
+def build_issues_pattern(clone_url: str | None = None) -> re.Pattern:
+    """Match "<keyword> #123", and full issue URLs for this repo when known.
+
+    e.g. both "fixes #123" and "fixes https://github.com/owner/repo/issues/123".
+    The URL is escaped so its dots cannot act as regex wildcards.
+    """
+    markers = [r"\#"]
+    if clone_url:
+        repo_url = clone_url[: -len(".git")] if clone_url.endswith(".git") else clone_url
+        markers.append(re.escape(f"{repo_url}/issues/"))
+    return re.compile(rf"(\w+)\s+(?:{'|'.join(markers)})(\d+)")
+
+
 class Repo:
     def __init__(self, owner: str, name: str, token: Optional[str] = None):
         """
@@ -85,20 +98,8 @@ class Repo:
             resolved_issues (list): list of issue numbers referenced by PR
         """
 
-        # get repo's issues url to support parsing issues linked with the full url
-        # eg: #1 and https://github.com/git/git/issues/1
-        issue_marker_prefix = r"\#"
-
-        repo_clone_url = pull.get("base", {}).get("repo", {}).get("clone_url")
-        if repo_clone_url and isinstance(repo_clone_url, str):
-            # strip trailing .git
-            repo_base_url = repo_clone_url[:-4]
-            # eg: https://github.com/git/git/issues/
-            repo_issues_url = f"{repo_base_url}/issues/"
-            issue_marker_prefix += "|" + repo_issues_url
-
-        # Define 1. issue number regex pattern 2. comment regex pattern 3. keywords
-        issues_pat = re.compile(rf"(\w+)\s+(?:{issue_marker_prefix})(\d+)")
+        clone_url = ((pull.get("base") or {}).get("repo") or {}).get("clone_url")
+        issues_pat = build_issues_pattern(clone_url)
         comments_pat = re.compile(r"(?s)<!--.*?-->")
 
         # Construct text to search over for issue numbers from PR body and commit messages
