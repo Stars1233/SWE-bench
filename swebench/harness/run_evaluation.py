@@ -537,7 +537,7 @@ def main(
 
     if not dataset:
         print("No instances to run.")
-        return make_run_report(predictions, full_dataset, run_id, client)
+        return make_run_report(predictions, full_dataset, run_id, client, report_dir)
     else:
         # run instances (images assumed to be pre-built)
         run_instances(
@@ -550,7 +550,7 @@ def main(
         )
 
     # make final report
-    return make_run_report(predictions, full_dataset, run_id, client)
+    return make_run_report(predictions, full_dataset, run_id, client, report_dir)
 
 
 if __name__ == "__main__":
