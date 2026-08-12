@@ -23,20 +23,15 @@ from swebench.harness.log_parsers import PARSER_REGISTRY
 def _resolve_case(case: str, sm: dict[str, str]) -> str | None:
     """Return the status-map key for ``case``, tolerating truncated parametrized ids.
 
-    676 parametrized test ids in SWE-bench_Verified are truncated mid-parameter
-    (issue #290), e.g. ``test_ogip_grammar_fail[log(photon`` — recognizable by an
-    unclosed square bracket. Such an id can never match the full id pytest
-    reports, so grading counted these cases as missing (i.e. failed) even when
-    they passed. For truncated ids only, fall back to prefix matching: accept a
-    unique prefix match, or multiple matches that agree on pass-vs-fail (grading
-    is unambiguous either way). Exact ids keep exact-match semantics.
+    676 expected ids in SWE-bench_Verified are truncated mid-parameter (issue #290),
+    e.g. ``test_ogip_grammar_fail[log(photon``. For those only, prefix-match when the
+    candidates agree on pass-vs-fail; exact ids keep exact-match semantics. Requires
+    ``[`` to outnumber ``]`` so free-form non-pytest names never reach the fallback.
 
-    The trigger is deliberately narrow. Truncation only ever drops a closing
-    bracket, so require ``[`` to outnumber ``]``; a name carrying a surplus ``]``
-    is a legitimate free-form name, not a truncation. This matters because
-    grading is language-agnostic while this defect is pytest-specific: no
-    expected name in SWE-bench_Multilingual or _Multimodal has an unbalanced
-    bracket, and this guard keeps it that way.
+    TODO(john-b-yang): wrong placement — a pytest/Verified-specific data defect
+    encoded in grading, which is meant to be benchmark-agnostic.
+    TODO(john-b-yang): relocate by repairing the 676 truncated ids in a Verified
+    revision (47 are ambiguous, needing manual resolution), then delete this.
     """
     if case in sm:
         return case
