@@ -28,7 +28,11 @@ SUITE_RAN = re.compile(
     r"|\d+ passing"
     r"|Tests:\s+\d+"
     r"|Test Suites:"
-    r"|^# tests \d+",
+    r"|^# tests \d+"
+    # openlayers' rendering harness logs "<case>': ok" per passing case at
+    # --log-level info; it records no failures otherwise, so this is the only
+    # positive evidence a silent (all-passing) run actually executed
+    r"|': ok$",
     re.M,
 )
 

@@ -195,6 +195,13 @@ def parse_eval_script(eval_script: str) -> list[str]:
     ]
 
 
+def _parse_image_assets(raw) -> dict:
+    """image_assets ships as a JSON string in the HF datasets, dict when local."""
+    if not raw:
+        return {}
+    return json.loads(raw) if isinstance(raw, str) else raw
+
+
 def make_test_spec(instance: dict) -> TestSpec:
     """
     Build a TestSpec from a dataset instance.
@@ -214,4 +221,5 @@ def make_test_spec(instance: dict) -> TestSpec:
         PASS_TO_PASS=json.loads(p2p) if isinstance(p2p, str) else p2p,
         log_parser=instance["log_parser"],
         eval_type=instance["eval_type"],
+        image_assets=_parse_image_assets(instance.get("image_assets")),
     )

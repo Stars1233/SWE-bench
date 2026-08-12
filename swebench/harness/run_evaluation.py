@@ -4,6 +4,7 @@ import docker
 import json
 import os
 import platform
+import urllib.request
 import traceback
 
 if platform.system() == "Linux":
@@ -21,6 +22,7 @@ from swebench.harness.constants import (
     LOG_INSTANCE,
     LOG_TEST_OUTPUT,
     RUN_EVALUATION_LOG_DIR,
+    START_TEST_OUTPUT,
 )
 from swebench.harness.docker_utils import (
     cleanup_container,
@@ -145,6 +147,51 @@ def create_container(
         raise EvaluationError(test_spec.instance_id, str(e), logger) from e
 
 
+def _stage_image_assets(container, test_spec, log_dir: Path, logger) -> list[str]:
+    """Stage multimodal binary assets in the container; return restore commands.
+
+    A text test_patch cannot carry binary files (e.g. expected.png rendering
+    baselines), so the dataset ships them as urls in image_assets. The eval
+    script `rm -f`s those paths before `git apply`, so they must be restored
+    after the patch is applied rather than copied in beforehand.
+    """
+    assets = (test_spec.image_assets or {}).get("test_patch") or []
+    if not assets:
+        return []
+    staging = Path(log_dir) / "image_assets"
+    staging.mkdir(parents=True, exist_ok=True)
+    container.exec_run("mkdir -p /image_assets", user="root")
+    restore = []
+    for asset in assets:
+        path, url = asset.get("path"), asset.get("url")
+        if not path or not url:
+            continue
+        flat = path.replace("/", "__")
+        local = staging / flat
+        try:
+            with urllib.request.urlopen(url, timeout=60) as resp:
+                local.write_bytes(resp.read())
+        except Exception as e:
+            logger.warning(f"Could not fetch image asset {url}: {e}")
+            continue
+        copy_to_container(container, local, PurePosixPath("/image_assets") / flat)
+        restore.append(f"mkdir -p $(dirname {path}) && cp /image_assets/{flat} {path}")
+    if restore:
+        logger.info(f"Staged {len(restore)} image asset(s) for restore after git apply")
+    return restore
+
+
+def _inject_asset_restore(eval_script: str, restore_cmds: list[str]) -> str:
+    """Insert asset-restore commands just before the test-output start marker."""
+    if not restore_cmds:
+        return eval_script
+    lines = eval_script.split("\n")
+    for idx, line in enumerate(lines):
+        if START_TEST_OUTPUT in line:
+            return "\n".join(lines[:idx] + restore_cmds + lines[idx:])
+    return eval_script + "\n" + "\n".join(restore_cmds)
+
+
 def run_instance(
     test_spec: TestSpec,
     pred: dict,
@@ -264,8 +311,14 @@ def run_instance(
         )
         logger.info(f"Git diff before:\n{git_diff_output_before}")
 
+        # Materialize multimodal binary assets (e.g. expected.png rendering
+        # baselines). A text test_patch cannot carry them, so the dataset ships
+        # them as urls in image_assets; without this the tests run against a
+        # missing baseline and error out.
+        restore_cmds = _stage_image_assets(container, test_spec, log_dir, logger)
+
         eval_file = Path(log_dir / "eval.sh")
-        eval_file.write_text(test_spec.eval_script)
+        eval_file.write_text(_inject_asset_restore(test_spec.eval_script, restore_cmds))
         logger.info(
             f"Eval script for {instance_id} written to {eval_file}; copying to container..."
         )

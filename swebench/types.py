@@ -3,7 +3,7 @@ Type definitions for swebench.
 """
 
 from typing import TypedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 class SWEbenchInstance(TypedDict):
@@ -37,6 +37,9 @@ class TestSpec:
     PASS_TO_PASS: list[str]
     log_parser: str = ""
     eval_type: str = ""
+    # Multimodal binary assets (e.g. expected.png baselines) that a text patch
+    # cannot carry; {"test_patch": [{"path": ..., "url": ...}], ...}
+    image_assets: dict = field(default_factory=dict)
 
     @property
     def eval_script(self):
