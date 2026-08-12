@@ -107,8 +107,14 @@ def get_logs_eval(test_spec: TestSpec, log_fp: str) -> tuple[dict[str, str], boo
             return {}, False
 
         # Get status map of evaluation results
-        content = content.split(START_TEST_OUTPUT)[1].split(END_TEST_OUTPUT)[0]
-        return log_parser(content, test_spec), True
+        sliced = content.split(START_TEST_OUTPUT)[1].split(END_TEST_OUTPUT)[0]
+        status_map = log_parser(sliced, test_spec)
+        if not status_map:
+            # Some runners emit results outside the markers (stdout/stderr ordering
+            # differs, e.g. on Modal), so fall back to the whole log rather than
+            # reporting a run with no results at all.
+            status_map = log_parser(content, test_spec)
+        return status_map, True
 
 
 def get_eval_tests_report(
