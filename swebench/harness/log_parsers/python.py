@@ -3,6 +3,20 @@ import re
 from swebench.harness.constants import TestStatus
 from swebench.types import TestSpec
 
+_SKIP_SUMMARY_COUNT = re.compile(r"^\[\d+\]$")
+
+
+def _is_skip_summary(status: str, name: str) -> bool:
+    """True for pytest's ``SKIPPED [N] path:line: reason`` summary, where [N] is not a test.
+
+    Deliberately scoped to SKIPPED. Wrapped progress lines produce a similar
+    ``PASSED [100%]`` artifact, but PASS_TO_PASS for pytest-dev__pytest-5262 and
+    -7521 literally expects ``[100%]``, so dropping it fails those instances.
+    TODO(john-b-yang): repair those two P2P lists, then widen this to any
+    bare bracketed count.
+    """
+    return status == TestStatus.SKIPPED.value and bool(_SKIP_SUMMARY_COUNT.match(name))
+
 
 def parse_log_pytest(log: str, test_spec: TestSpec) -> dict[str, str]:
     """
@@ -21,6 +35,8 @@ def parse_log_pytest(log: str, test_spec: TestSpec) -> dict[str, str]:
                 line = line.replace(" - ", " ")
             test_case = line.split()
             if len(test_case) <= 1:
+                continue
+            if _is_skip_summary(test_case[0], test_case[1]):
                 continue
             test_status_map[test_case[1]] = test_case[0]
     return test_status_map
@@ -44,6 +60,8 @@ def parse_log_pytest_options(log: str, test_spec: TestSpec) -> dict[str, str]:
                 line = line.replace(" - ", " ")
             test_case = line.split()
             if len(test_case) <= 1:
+                continue
+            if _is_skip_summary(test_case[0], test_case[1]):
                 continue
             has_option = option_pattern.search(test_case[1])
             if has_option:
@@ -161,7 +179,7 @@ def parse_log_pytest_v2(log: str, test_spec: TestSpec) -> dict[str, str]:
                 # drop the trailing " - <assertion message>" so it can't enter the id
                 line = line.split(" - ", 1)[0]
             test_case = line.split()
-            if len(test_case) >= 2:
+            if len(test_case) >= 2 and not _is_skip_summary(test_case[0], test_case[1]):
                 test_status_map[" ".join(test_case[1:])] = test_case[0]
         # Support older pytest versions by checking if the line ends with the test status
         elif any([line.endswith(x.value) for x in TestStatus]):
@@ -247,6 +265,8 @@ def parse_log_matplotlib(log: str, test_spec: TestSpec) -> dict[str, str]:
                 line = line.replace(" - ", " ")
             test_case = line.split()
             if len(test_case) <= 1:
+                continue
+            if _is_skip_summary(test_case[0], test_case[1]):
                 continue
             test_status_map[test_case[1]] = test_case[0]
     return test_status_map

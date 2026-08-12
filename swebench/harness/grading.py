@@ -52,11 +52,22 @@ def test_passed(case: str, sm: dict[str, str]) -> bool:
     ]
 
 
+def test_maintained(case: str, sm: dict[str, str]) -> bool:
+    """P2P semantics: a skipped test is not a regression, unlike for F2P."""
+    key = _resolve_case(case, sm)
+    return test_passed(case, sm) or (
+        key is not None and sm[key] == TestStatus.SKIPPED.value
+    )
+
+
 def test_failed(case: str, sm: dict[str, str]) -> bool:
     key = _resolve_case(case, sm)
     return key is None or sm[key] in [
         TestStatus.FAILED.value,
         TestStatus.ERROR.value,
+        # a skipped F2P test is not a resolution; without this, a patch that makes
+        # every F2P test skip lands in neither list and scores RESOLVED_FULL
+        TestStatus.SKIPPED.value,
     ]
 
 
@@ -136,6 +147,12 @@ def get_eval_tests_report(
         elif test_failed(test_case, eval_status_map):
             failed.append(test_case)
 
+    def check_maintained(test_case, eval_status_map, success, failed):
+        if test_maintained(test_case, eval_status_map):
+            success.append(test_case)
+        elif test_failed(test_case, eval_status_map):
+            failed.append(test_case)
+
     def check_fail_only(test_case, eval_status_map, success, failed):
         if (
             test_case in eval_status_map
@@ -156,10 +173,13 @@ def get_eval_tests_report(
         check_test_case(test_case, eval_status_map, f2p_success, f2p_failure)
 
     # Calculate maintenance metrics
+    check_p2p = (
+        check_maintained if eval_type == EvalType.PASS_AND_FAIL else check_fail_only
+    )
     p2p_success = []
     p2p_failure = []
     for test_case in gold_results[PASS_TO_PASS]:
-        check_test_case(test_case, eval_status_map, p2p_success, p2p_failure)
+        check_p2p(test_case, eval_status_map, p2p_success, p2p_failure)
 
     results = {
         FAIL_TO_PASS: {
