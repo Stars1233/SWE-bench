@@ -53,3 +53,29 @@ def test_missing_markers_still_reports_not_found(tmp_path):
     log.write_text("PASSED tests/test_a.py::test_x\n")
     sm, found = get_logs_eval(_spec(), str(log))
     assert (sm, found) == ({}, False)
+
+
+def test_empty_results_without_evidence_is_not_found(tmp_path):
+    """A suite that never ran must not grade as a pass.
+
+    Under EvalType.FAIL_ONLY an absent test counts as success, so an empty status
+    map with no sign the runner executed would score every F2P test as resolved --
+    which is how 73 openlayers instances "passed" with Chrome failing to launch.
+    """
+    log = tmp_path / "test_output.txt"
+    log.write_text(
+        f"{START_TEST_OUTPUT}\nChrome failed 2 times (cannot start). Giving up.\n"
+        f"{END_TEST_OUTPUT}\n"
+    )
+    assert get_logs_eval(_spec(), str(log)) == ({}, False)
+
+
+def test_empty_results_with_runner_evidence_is_a_clean_run(tmp_path):
+    """Karma prints only failures, so 'ran, no failures' is a legitimate empty map."""
+    log = tmp_path / "test_output.txt"
+    log.write_text(
+        f"{START_TEST_OUTPUT}\nExecuted 1339 of 1346 (skipped 7) SUCCESS\n"
+        f"TOTAL: 1339 SUCCESS\n{END_TEST_OUTPUT}\n"
+    )
+    sm, found = get_logs_eval(_spec(), str(log))
+    assert (sm, found) == ({}, True)

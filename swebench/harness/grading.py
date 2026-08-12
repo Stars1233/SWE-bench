@@ -1,3 +1,4 @@
+import re
 from typing import Any
 
 from swebench.harness.constants import (
@@ -17,6 +18,19 @@ from swebench.harness.constants import (
 )
 from swebench.types import TestSpec
 from swebench.harness.log_parsers import PARSER_REGISTRY
+
+
+# Evidence that a test runner actually executed, used to tell "ran with no failures"
+# apart from "never ran" when the parsed status map is empty
+SUITE_RAN = re.compile(
+    r"Executed \d+ of \d+"
+    r"|TOTAL: \d+ (?:SUCCESS|FAILED)"
+    r"|\d+ passing"
+    r"|Tests:\s+\d+"
+    r"|Test Suites:"
+    r"|^# tests \d+",
+    re.M,
+)
 
 
 # MARK: Utility functions
@@ -114,6 +128,12 @@ def get_logs_eval(test_spec: TestSpec, log_fp: str) -> tuple[dict[str, str], boo
             # differs, e.g. on Modal), so fall back to the whole log rather than
             # reporting a run with no results at all.
             status_map = log_parser(content, test_spec)
+        if not status_map and not SUITE_RAN.search(content):
+            # No parsed results *and* no sign the suite ran: the run is invalid, not
+            # a pass. Under EvalType.FAIL_ONLY an absent test counts as success, so
+            # without this a suite that never started (e.g. a browser that fails to
+            # launch) scores every F2P test as resolved.
+            return {}, False
         return status_map, True
 
 
