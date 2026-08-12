@@ -114,6 +114,9 @@ def create_container(
                 user=CONTAINER_USER,
                 detach=True,
                 command="tail -f /dev/null",
+                # Docker's default seccomp profile only permits CLONE_NEWUSER with
+                # CAP_SYS_ADMIN, which browser sandboxes need (e.g. openlayers karma)
+                cap_add=["SYS_ADMIN"],
             )
         except docker.errors.APIError as e:
             if "409" in str(e) or "Conflict" in str(e):
@@ -127,6 +130,9 @@ def create_container(
                     user=CONTAINER_USER,
                     detach=True,
                     command="tail -f /dev/null",
+                # Docker's default seccomp profile only permits CLONE_NEWUSER with
+                # CAP_SYS_ADMIN, which browser sandboxes need (e.g. openlayers karma)
+                cap_add=["SYS_ADMIN"],
                 )
             else:
                 raise
