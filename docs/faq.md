@@ -105,14 +105,14 @@ The evaluation harness caches results by `run_id` and `instance_id` only. It doe
 To re-evaluate an instance with a different prediction diff, you must use a different `run_id`. For example:
 ```bash
 # First evaluation
-python -m swebench.harness.run_evaluation \
-    --predictions_path predictions_v1.jsonl \
-    --run_id my_run_v1
+swebench eval verified \
+    --predictions predictions_v1.jsonl \
+    --run-id my_run_v1
 
 # Re-evaluation with different predictions (must use different run_id)
-python -m swebench.harness.run_evaluation \
-    --predictions_path predictions_v2.jsonl \
-    --run_id my_run_v2
+swebench eval verified \
+    --predictions predictions_v2.jsonl \
+    --run-id my_run_v2
 ```
 
 ## Troubleshooting
