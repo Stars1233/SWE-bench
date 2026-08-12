@@ -158,13 +158,16 @@ def parse_log_pytest_v2(log: str, test_spec: TestSpec) -> dict[str, str]:
         line = line.translate(translator)
         if any([line.startswith(x.value) for x in TestStatus]):
             if line.startswith(TestStatus.FAILED.value):
-                line = line.replace(" - ", " ")
+                # drop the trailing " - <assertion message>" so it can't enter the id
+                line = line.split(" - ", 1)[0]
             test_case = line.split()
-            test_status_map[" ".join(test_case[1:])] = test_case[0]
+            if len(test_case) >= 2:
+                test_status_map[" ".join(test_case[1:])] = test_case[0]
         # Support older pytest versions by checking if the line ends with the test status
         elif any([line.endswith(x.value) for x in TestStatus]):
             test_case = line.split()
-            test_status_map[" ".join(test_case[:-1])] = test_case[-1]
+            if len(test_case) >= 2:
+                test_status_map[" ".join(test_case[:-1])] = test_case[-1]
     return test_status_map
 
 
