@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import docker
 import json
+import os
 import platform
-import threading
+import urllib.request
 import traceback
 
 if platform.system() == "Linux":
@@ -11,156 +12,240 @@ if platform.system() == "Linux":
 
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from pathlib import Path, PurePosixPath
-from tqdm.auto import tqdm
 
+from swebench.image_builder.constants import CONTAINER_USER, CONTAINER_WORKDIR
 from swebench.harness.constants import (
     APPLY_PATCH_FAIL,
     APPLY_PATCH_PASS,
-    DOCKER_PATCH,
-    DOCKER_USER,
-    DOCKER_WORKDIR,
-    INSTANCE_IMAGE_BUILD_DIR,
-    KEY_INSTANCE_ID,
-    KEY_MODEL,
-    KEY_PREDICTION,
+    CONTAINER_PATCH_FILE,
     LOG_REPORT,
     LOG_INSTANCE,
     LOG_TEST_OUTPUT,
-    PRE_FLIGHT_FAIL,
-    PRE_FLIGHT_PASS,
     RUN_EVALUATION_LOG_DIR,
-    ResolvedStatus,
-    UTF8,
+    START_TEST_OUTPUT,
 )
 from swebench.harness.docker_utils import (
-    clean_images,
     cleanup_container,
     copy_to_container,
     exec_run_with_timeout,
-    list_images,
-    remove_image,
-    should_remove,
 )
-from swebench.harness.docker_build import (
-    BuildImageError,
-    build_container,
-    build_env_images,
-    close_logger,
-    setup_logger,
-)
+import logging
 from swebench.harness.grading import get_eval_report
 from swebench.harness.reporting import make_run_report
 from swebench.harness.modal_eval import (
     run_instances_modal,
     validate_modal_credentials,
 )
-from swebench.harness.test_spec.test_spec import make_test_spec, TestSpec
+from swebench.types import TestSpec
+from swebench.harness.utils import make_test_spec
 from swebench.harness.utils import (
     EvaluationError,
     load_swebench_dataset,
     get_predictions_from_file,
     run_threadpool,
     str2bool,
-    optional_str,
 )
+
+from swebench.logger import setup_logger, close_logger
 
 GIT_APPLY_CMDS = [
     "git apply --verbose",
+    "git apply --verbose --3way",
     "git apply --verbose --reject",
-    "patch --batch --fuzz=5 -p1 -i",
+    "patch --batch --forward --fuzz=5 -p1 -i",
 ]
 
+DOCKER_CLIENT_TIMEOUT = int(os.environ.get("SWEBENCH_DOCKER_TIMEOUT", "1800"))
+DOCKER_CLIENT_POOL_SIZE = int(os.environ.get("SWEBENCH_DOCKER_POOL_SIZE", "128"))
 
-def verify_environment(
-    container,
+
+def _docker_client() -> docker.DockerClient:
+    return docker.from_env(
+        timeout=DOCKER_CLIENT_TIMEOUT,
+        max_pool_size=DOCKER_CLIENT_POOL_SIZE,
+    )
+
+
+def create_container(
     test_spec: TestSpec,
-    logger,
-) -> bool:
+    client: docker.DockerClient,
+    run_id: str,
+    logger: logging.Logger,
+):
     """
-    Verify environment integrity before applying model patch.
-    Checks that the repository is set up correctly and test files exist.
+    Creates a container from an instance image for running evaluation.
 
     Args:
-        container: Docker container to check
-        test_spec (TestSpec): Test specification
-        logger: Logger for output
-    Returns:
-        bool: True if environment is sound, False if infrastructure failure detected
+        test_spec (TestSpec): Test spec with evaluation details
+        client (docker.DockerClient): Docker client for creating the container
+        run_id (str): Run ID identifying process, used for the container name
+        logger (logging.Logger): Logger to use for logging the creation process
     """
-    workdir = DOCKER_WORKDIR
+    container = None
+    try:
+        # Check if the image exists
+        try:
+            client.images.get(test_spec.image)
+        except docker.errors.ImageNotFound:
+            try:
+                logger.info("Image not found locally, attempting to pull...")
+                client.images.pull(test_spec.image)
+            except docker.errors.ImageNotFound:
+                raise EvaluationError(
+                    test_spec.instance_id,
+                    f"Image {test_spec.image} not found for {test_spec.instance_id}",
+                    logger,
+                )
 
-    # Check 1: Repository directory exists and is a git repo
-    check_repo = container.exec_run(
-        f"test -d {workdir} && git -C {workdir} rev-parse --git-dir",
-        user=DOCKER_USER,
-    )
-    if check_repo.exit_code != 0:
-        logger.info(
-            f"{PRE_FLIGHT_FAIL}: Repository directory {workdir} not found or not a git repo"
+        logger.info(f"Creating container for {test_spec.instance_id}...")
+
+        container_name = f"sweb.eval.{test_spec.instance_id.lower()}.{run_id}"
+        # Remove any existing container with this name (handles ghost containers)
+        try:
+            old = client.containers.get(container_name)
+            old.remove(force=True)
+            logger.info(f"Removed existing container {container_name}")
+        except docker.errors.NotFound:
+            pass
+        except Exception:
+            pass
+        try:
+            container = client.containers.create(
+                image=test_spec.image,
+                name=container_name,
+                user=CONTAINER_USER,
+                detach=True,
+                command="tail -f /dev/null",
+                # Docker's default seccomp profile only permits CLONE_NEWUSER with
+                # CAP_SYS_ADMIN, which browser sandboxes need (e.g. openlayers karma)
+                cap_add=["SYS_ADMIN"],
+            )
+        except docker.errors.APIError as e:
+            if "409" in str(e) or "Conflict" in str(e):
+                # Ghost container — use a unique suffix
+                import time
+                container_name = f"{container_name}.{int(time.time())}"
+                logger.info(f"Retrying with unique name: {container_name}")
+                container = client.containers.create(
+                    image=test_spec.image,
+                    name=container_name,
+                    user=CONTAINER_USER,
+                    detach=True,
+                    command="tail -f /dev/null",
+                # Docker's default seccomp profile only permits CLONE_NEWUSER with
+                # CAP_SYS_ADMIN, which browser sandboxes need (e.g. openlayers karma)
+                cap_add=["SYS_ADMIN"],
+                )
+            else:
+                raise
+        logger.info(f"Container for {test_spec.instance_id} created: {container.id}")
+        return container
+    except Exception as e:
+        logger.error(f"Error creating container for {test_spec.instance_id}: {e}")
+        logger.info(traceback.format_exc())
+        cleanup_container(client, container, logger)
+        raise EvaluationError(test_spec.instance_id, str(e), logger) from e
+
+
+def _resolve_asset_bytes(asset: dict, assets_dir: Path | None, logger) -> bytes | None:
+    """Read an asset from a local mirror if present, else fetch its url.
+
+    The mirror is laid out as <assets_dir>/<instance_id>/<asset path>, which is how
+    the dataset's own dockerfile repo stores them. Nothing here is dataset-specific:
+    it only uses the `path`/`url` fields every image_assets entry carries.
+    """
+    if assets_dir is not None:
+        local = Path(assets_dir) / asset["instance_id"] / asset["path"]
+        if local.is_file():
+            return local.read_bytes()
+    try:
+        with urllib.request.urlopen(asset["url"], timeout=60) as resp:
+            return resp.read()
+    except Exception as e:
+        logger.warning(f"Could not fetch image asset {asset['url']}: {e}")
+        return None
+
+
+def _stage_image_assets(
+    container, test_spec, log_dir: Path, logger, assets_dir: Path | None = None
+) -> list[str]:
+    """Stage a patch's binary assets in the container; return restore commands.
+
+    A text patch cannot carry binary files (e.g. expected.png rendering baselines),
+    so the dataset lists them in image_assets. They must land in the working tree
+    *after* the eval script's `rm -f` + `git apply`, so they arrive with the patch
+    rather than being baked into the image -- test data in the image would be
+    visible to anything with a shell in it.
+    """
+    declared = test_spec.image_assets or {}
+    assets = []
+    for key in ("test_patch", "patch"):
+        for entry in declared.get(key) or []:
+            if entry.get("path") and entry.get("url"):
+                assets.append({**entry, "instance_id": test_spec.instance_id})
+    if not assets:
+        return []
+    staging = Path(log_dir) / "image_assets"
+    staging.mkdir(parents=True, exist_ok=True)
+    container.exec_run("mkdir -p /image_assets", user="root")
+    restore, from_mirror = [], 0
+    for asset in assets:
+        data = _resolve_asset_bytes(asset, assets_dir, logger)
+        if data is None:
+            continue
+        if assets_dir is not None and (Path(assets_dir) / asset["instance_id"] / asset["path"]).is_file():
+            from_mirror += 1
+        flat = asset["path"].replace("/", "__")
+        local = staging / flat
+        local.write_bytes(data)
+        copy_to_container(container, local, PurePosixPath("/image_assets") / flat)
+        restore.append(
+            f"mkdir -p $(dirname {asset['path']}) && cp /image_assets/{flat} {asset['path']}"
         )
-        return False
+    if restore:
+        logger.info(
+            f"Staged {len(restore)} patch asset(s) for restore after git apply "
+            f"({from_mirror} from the local mirror, {len(restore) - from_mirror} fetched)"
+        )
+    return restore
 
-    # Check 2: Test files from test_patch exist in the repository
-    if test_spec.test_files:
-        missing_files = []
-        for test_file in test_spec.test_files:
-            check_file = container.exec_run(
-                f"test -f {workdir}/{test_file}",
-                user=DOCKER_USER,
-            )
-            if check_file.exit_code != 0:
-                missing_files.append(test_file)
 
-        if missing_files:
-            logger.info(
-                f"{PRE_FLIGHT_FAIL}: Missing test files in {workdir}: {missing_files}"
-            )
-            logger.info(
-                f"{PRE_FLIGHT_FAIL}: This is an infrastructure failure, not a model failure."
-            )
-            return False
-
-    # Check 3: Basic tooling is functional
-    check_git = container.exec_run(
-        "git --version",
-        user=DOCKER_USER,
-    )
-    if check_git.exit_code != 0:
-        logger.info(f"{PRE_FLIGHT_FAIL}: Git not available in container")
-        return False
-
-    logger.info(
-        f"{PRE_FLIGHT_PASS}: Environment verification passed for {test_spec.instance_id}"
-    )
-    return True
+def _inject_asset_restore(eval_script: str, restore_cmds: list[str]) -> str:
+    """Insert asset-restore commands just before the test-output start marker."""
+    if not restore_cmds:
+        return eval_script
+    lines = eval_script.split("\n")
+    for idx, line in enumerate(lines):
+        if START_TEST_OUTPUT in line:
+            return "\n".join(lines[:idx] + restore_cmds + lines[idx:])
+    return eval_script + "\n" + "\n".join(restore_cmds)
 
 
 def run_instance(
     test_spec: TestSpec,
     pred: dict,
-    rm_image: bool,
-    force_rebuild: bool,
     client: docker.DockerClient,
     run_id: str,
     timeout: int | None = None,
     rewrite_reports: bool = False,
-) -> dict:
+    skip_patch: bool = False,
+    assets_dir: str | None = None,
+):
     """
     Run a single instance with the given prediction.
 
     Args:
-        test_spec (TestSpec): TestSpec instance
+        test_spec (TestSpec): TestSpec instance with pre-built image
         pred (dict): Prediction w/ model_name_or_path, model_patch, instance_id
-        rm_image (bool): Whether to remove the image after running
-        force_rebuild (bool): Whether to force rebuild the image
         client (docker.DockerClient): Docker client
         run_id (str): Run ID
         timeout (int): Timeout for running tests
         rewrite_reports (bool): True if eval run is just to reformat existing report
+        skip_patch (bool): True to skip applying model patch (negative test mode)
     """
     # Set up logging directory
     instance_id = test_spec.instance_id
-    model_name_or_path = pred.get(KEY_MODEL, "None").replace("/", "__")
+    model_name_or_path = pred.get("model_name_or_path", "None").replace("/", "__")
     log_dir = RUN_EVALUATION_LOG_DIR / run_id / model_name_or_path / instance_id
 
     # Set up report file
@@ -178,32 +263,9 @@ def run_instance(
         # Write report to report.json
         with open(report_path, "w") as f:
             f.write(json.dumps(report, indent=4))
-        return {
-            "completed": True,
-            "resolved": report[instance_id]["resolved"],
-        }
+        return instance_id, report
     if report_path.exists():
-        report = json.loads(report_path.read_text())
-        return {
-            "completed": True,
-            "resolved": report[instance_id]["resolved"],
-        }
-
-    if not test_spec.is_remote_image:
-        # Link the image build dir in the log dir
-        build_dir = INSTANCE_IMAGE_BUILD_DIR / test_spec.instance_image_key.replace(
-            ":", "__"
-        )
-        image_build_link = log_dir / "image_build_dir"
-        if not image_build_link.exists():
-            try:
-                # link the image build dir in the log dir
-                image_build_link.symlink_to(
-                    build_dir.absolute(), target_is_directory=True
-                )
-            except:
-                # some error, idk why
-                pass
+        return instance_id, json.loads(report_path.read_text())
 
     # Set up logger
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -212,77 +274,83 @@ def run_instance(
 
     # Run the instance
     container = None
-    eval_completed = False
-    report = {}
     try:
-        # Build + start instance container (instance image should already be built)
-        container = build_container(
-            test_spec, client, run_id, logger, rm_image, force_rebuild
-        )
+        # Create container from image
+        container = create_container(test_spec, client, run_id, logger)
         container.start()
         logger.info(f"Container for {instance_id} started: {container.id}")
 
-        # Pre-flight environment verification before applying model patch
-        if not verify_environment(container, test_spec, logger):
-            report = {
-                instance_id: {
-                    "patch_is_None": False,
-                    "patch_exists": False,
-                    "patch_successfully_applied": False,
-                    "resolved": False,
-                    "infra_failure": True,
-                }
-            }
-            with open(report_path, "w") as f:
-                f.write(json.dumps(report, indent=4))
-            raise EvaluationError(
-                instance_id,
-                f"{PRE_FLIGHT_FAIL}: Environment verification failed for {instance_id}",
-                logger,
+        if not skip_patch:
+            # Copy model prediction as patch file to container
+            patch_file = Path(log_dir / "patch.diff")
+            patch_file.write_text(pred["model_patch"] or "")
+            logger.info(
+                f"Intermediate patch for {instance_id} written to {patch_file}, now applying to container..."
             )
+            copy_to_container(container, patch_file, PurePosixPath(CONTAINER_PATCH_FILE))
 
-        # Copy model prediction as patch file to container
-        patch_file = Path(log_dir / "patch.diff")
-        patch_file.write_text(pred[KEY_PREDICTION] or "")
-        logger.info(
-            f"Intermediate patch for {instance_id} written to {patch_file}, now applying to container..."
-        )
-        copy_to_container(container, patch_file, PurePosixPath(DOCKER_PATCH))
-
-        # Attempt to apply patch to container (TODO: FIX THIS)
-        applied_patch = False
-        for git_apply_cmd in GIT_APPLY_CMDS:
-            val = container.exec_run(
-                f"{git_apply_cmd} {DOCKER_PATCH}",
-                workdir=DOCKER_WORKDIR,
-                user=DOCKER_USER,
-            )
-            if val.exit_code == 0:
-                logger.info(f"{APPLY_PATCH_PASS}:\n{val.output.decode(UTF8)}")
-                applied_patch = True
-                break
-            else:
-                logger.info(f"Failed to apply patch to container: {git_apply_cmd}")
-        if not applied_patch:
-            logger.info(f"{APPLY_PATCH_FAIL}:\n{val.output.decode(UTF8)}")
-            raise EvaluationError(
-                instance_id,
-                f"{APPLY_PATCH_FAIL}:\n{val.output.decode(UTF8)}",
-                logger,
-            )
+            # Attempt to apply patch to container
+            applied_patch = False
+            for attempt, git_apply_cmd in enumerate(GIT_APPLY_CMDS):
+                if attempt:
+                    # a failed attempt (notably --reject) leaves partial state behind,
+                    # which makes every later command fail; restart from a pristine tree
+                    container.exec_run(
+                        ["/bin/bash", "-c", "git checkout -- . ; git clean -fd"],
+                        workdir=CONTAINER_WORKDIR,
+                        user=CONTAINER_USER,
+                    )
+                val = container.exec_run(
+                    f"{git_apply_cmd} {CONTAINER_PATCH_FILE}",
+                    workdir=CONTAINER_WORKDIR,
+                    user=CONTAINER_USER,
+                )
+                if val.exit_code == 0:
+                    logger.info(f"{APPLY_PATCH_PASS}:\n{val.output.decode('utf-8')}")
+                    applied_patch = True
+                    break
+                else:
+                    logger.info(f"Failed to apply patch to container: {git_apply_cmd}")
+            if not applied_patch:
+                # the chain can leave the patch fully applied while each command still exited non-zero
+                reverse_check = container.exec_run(
+                    f"git apply --check --reverse {CONTAINER_PATCH_FILE}",
+                    workdir=CONTAINER_WORKDIR,
+                    user=CONTAINER_USER,
+                )
+                if reverse_check.exit_code == 0:
+                    logger.info(f"{APPLY_PATCH_PASS}: verified already applied")
+                    applied_patch = True
+            if not applied_patch:
+                logger.info(f"{APPLY_PATCH_FAIL}:\n{val.output.decode('utf-8')}")
+                raise EvaluationError(
+                    instance_id,
+                    f"{APPLY_PATCH_FAIL}:\n{val.output.decode('utf-8')}",
+                    logger,
+                )
+        else:
+            logger.info(f"Skipping model patch for {instance_id} (--no-patch mode)")
 
         # Get git diff before running eval script
         git_diff_output_before = (
             container.exec_run(
-                "git -c core.fileMode=false diff", workdir=DOCKER_WORKDIR
+                "git -c core.fileMode=false diff", workdir=CONTAINER_WORKDIR
             )
-            .output.decode(UTF8)
+            .output.decode("utf-8")
             .strip()
         )
         logger.info(f"Git diff before:\n{git_diff_output_before}")
 
+        # Materialize multimodal binary assets (e.g. expected.png rendering
+        # baselines). A text test_patch cannot carry them, so the dataset ships
+        # them as urls in image_assets; without this the tests run against a
+        # missing baseline and error out.
+        restore_cmds = _stage_image_assets(
+            container, test_spec, log_dir, logger, assets_dir
+        )
+
         eval_file = Path(log_dir / "eval.sh")
-        eval_file.write_text(test_spec.eval_script)
+        eval_file.write_text(_inject_asset_restore(test_spec.eval_script, restore_cmds))
         logger.info(
             f"Eval script for {instance_id} written to {eval_file}; copying to container..."
         )
@@ -308,9 +376,9 @@ def run_instance(
         # Get git diff after running eval script (ignore permission changes)
         git_diff_output_after = (
             container.exec_run(
-                "git -c core.fileMode=false diff", workdir=DOCKER_WORKDIR
+                "git -c core.fileMode=false diff", workdir=CONTAINER_WORKDIR
             )
-            .output.decode(UTF8)
+            .output.decode("utf-8")
             .strip()
         )
 
@@ -335,8 +403,8 @@ def run_instance(
         # Write report to report.json
         with open(report_path, "w") as f:
             f.write(json.dumps(report, indent=4))
-        eval_completed = True
-    except (EvaluationError, BuildImageError) as e:
+        return instance_id, report
+    except EvaluationError as e:
         error_msg = traceback.format_exc()
         logger.info(error_msg)
         print(e)
@@ -350,68 +418,34 @@ def run_instance(
     finally:
         # Remove instance container + image, close logger
         cleanup_container(client, container, logger)
-        if rm_image:
-            remove_image(client, test_spec.instance_image_key, logger)
         close_logger(logger)
-        return {
-            "completed": eval_completed,
-            "resolved": report.get(instance_id, {}).get("resolved", False),
-            "infra_failure": report.get(instance_id, {}).get("infra_failure", False),
-        }
+    return
 
 
 def run_instances(
     predictions: dict,
     instances: list,
-    cache_level: str,
-    clean: bool,
-    force_rebuild: bool,
     max_workers: int,
     run_id: str,
     timeout: int,
-    namespace: str | None = "swebench",
-    instance_image_tag: str = "latest",
-    env_image_tag: str = "latest",
     rewrite_reports: bool = False,
+    skip_patch: bool = False,
+    assets_dir: str | None = None,
 ):
     """
     Run all instances for the given predictions in parallel.
+    Expects instances to have pre-built images.
 
     Args:
         predictions (dict): Predictions dict generated by the model
-        instances (list): List of instances
-        cache_level (str): Cache level
-        clean (bool): Clean images above cache level
-        force_rebuild (bool): Force rebuild images
+        instances (list): List of instances with 'image' field
         max_workers (int): Maximum number of workers
         run_id (str): Run ID
         timeout (int): Timeout for running tests
+        rewrite_reports (bool): True if eval run is just to reformat existing report
     """
-    client = docker.from_env()
-    test_specs = list(
-        map(
-            lambda instance: make_test_spec(
-                instance,
-                namespace=namespace,
-                instance_image_tag=instance_image_tag,
-                env_image_tag=env_image_tag,
-            ),
-            instances,
-        )
-    )
-
-    # print number of existing instance images
-    instance_image_ids = {x.instance_image_key for x in test_specs}
-    existing_images = {
-        tag
-        for i in client.images.list(all=True)
-        for tag in i.tags
-        if tag in instance_image_ids
-    }
-    if not force_rebuild and len(existing_images):
-        print(
-            f"Found {len(existing_images)} existing instance images. Will reuse them."
-        )
+    client = _docker_client()
+    test_specs = [make_test_spec(instance) for instance in instances]
 
     # run instances in parallel
     payloads = []
@@ -420,43 +454,18 @@ def run_instances(
             (
                 test_spec,
                 predictions[test_spec.instance_id],
-                should_remove(
-                    test_spec.instance_image_key,
-                    cache_level,
-                    clean,
-                    existing_images,
-                ),
-                force_rebuild,
                 client,
                 run_id,
                 timeout,
                 rewrite_reports,
+                skip_patch,
+                assets_dir,
             )
         )
 
     # run instances in parallel
     print(f"Running {len(instances)} instances...")
-    stats = {"✓": 0, "✖": 0, "infra": 0, "error": 0}
-    pbar = tqdm(total=len(payloads), desc="Evaluation", postfix=stats)
-    lock = threading.Lock()
-
-    def run_evaluation_with_progress(*args):
-        result = run_instance(*args)
-        with lock:
-            if result.get("infra_failure"):
-                stats["infra"] += 1
-            elif result["completed"]:
-                if result["resolved"]:
-                    stats["✓"] += 1
-                else:
-                    stats["✖"] += 1
-            else:
-                stats["error"] += 1
-            pbar.set_postfix(stats)
-            pbar.update()
-        return result
-
-    run_threadpool(run_evaluation_with_progress, payloads, max_workers)
+    run_threadpool(run_instance, payloads, max_workers)
     print("All instances run.")
 
 
@@ -476,7 +485,7 @@ def get_dataset_from_preds(
     """
     # load dataset
     dataset = load_swebench_dataset(dataset_name, split)
-    dataset_ids = {i[KEY_INSTANCE_ID] for i in dataset}
+    dataset_ids = {i["instance_id"] for i in dataset}
 
     if instance_ids:
         # check that all instance IDs have predictions
@@ -496,66 +505,66 @@ def get_dataset_from_preds(
             )
         )
     if instance_ids:
-        dataset = [i for i in dataset if i[KEY_INSTANCE_ID] in instance_ids]
+        dataset = [i for i in dataset if i["instance_id"] in instance_ids]
 
     if rewrite_reports:
         # we only return instances that have existing test outputs
         test_output_ids = set()
         for instance in dataset:
-            if instance[KEY_INSTANCE_ID] not in predictions:
+            if instance["instance_id"] not in predictions:
                 continue
-            prediction = predictions[instance[KEY_INSTANCE_ID]]
+            prediction = predictions[instance["instance_id"]]
             test_output_file = (
                 RUN_EVALUATION_LOG_DIR
                 / run_id
                 / prediction["model_name_or_path"].replace("/", "__")
-                / prediction[KEY_INSTANCE_ID]
+                / prediction["instance_id"]
                 / "test_output.txt"
             )
             if test_output_file.exists():
-                test_output_ids.add(instance[KEY_INSTANCE_ID])
+                test_output_ids.add(instance["instance_id"])
         dataset = [
             i
             for i in dataset
-            if i[KEY_INSTANCE_ID] in prediction_ids
-            and i[KEY_INSTANCE_ID] in test_output_ids
+            if i["instance_id"] in prediction_ids
+            and i["instance_id"] in test_output_ids
         ]
         return dataset
 
     # check which instance IDs have already been run
     completed_ids = set()
     for instance in dataset:
-        if instance[KEY_INSTANCE_ID] not in prediction_ids:
+        if instance["instance_id"] not in prediction_ids:
             # skip instances without predictions
             continue
-        prediction = predictions[instance[KEY_INSTANCE_ID]]
+        prediction = predictions[instance["instance_id"]]
         report_file = (
             RUN_EVALUATION_LOG_DIR
             / run_id
-            / prediction[KEY_MODEL].replace("/", "__")
-            / prediction[KEY_INSTANCE_ID]
+            / prediction["model_name_or_path"].replace("/", "__")
+            / prediction["instance_id"]
             / LOG_REPORT
         )
         if report_file.exists():
-            completed_ids.add(instance[KEY_INSTANCE_ID])
+            completed_ids.add(instance["instance_id"])
 
     if completed_ids and exclude_completed:
         # filter dataset to only instances that have not been run
         print(f"{len(completed_ids)} instances already run, skipping...")
-        dataset = [i for i in dataset if i[KEY_INSTANCE_ID] not in completed_ids]
+        dataset = [i for i in dataset if i["instance_id"] not in completed_ids]
 
     empty_patch_ids = {
         k
         for k, v in predictions.items()
-        if v[KEY_PREDICTION] == "" or v[KEY_PREDICTION] is None
+        if v["model_patch"] == "" or v["model_patch"] is None
     }
 
     # filter dataset to only instances with predictions
     dataset = [
         i
         for i in dataset
-        if i[KEY_INSTANCE_ID] in prediction_ids
-        and i[KEY_INSTANCE_ID] not in empty_patch_ids
+        if i["instance_id"] in prediction_ids
+        and i["instance_id"] not in empty_patch_ids
     ]
     return dataset
 
@@ -566,28 +575,22 @@ def main(
     instance_ids: list,
     predictions_path: str,
     max_workers: int,
-    force_rebuild: bool,
-    cache_level: str,
-    clean: bool,
     open_file_limit: int,
     run_id: str,
     timeout: int,
-    namespace: str | None,
     rewrite_reports: bool,
     modal: bool,
-    instance_image_tag: str = "latest",
-    env_image_tag: str = "latest",
     report_dir: str = ".",
+    assets_dir: str | None = None,
 ):
     """
     Run evaluation harness for the given dataset and predictions.
     """
     if dataset_name == "SWE-bench/SWE-bench_Multimodal" and split == "test":
         print(
-            "⚠️ Local evaluation for the test split of SWE-bench Multimodal is not supported. "
-            "Please check out sb-cli (https://github.com/swe-bench/sb-cli/) for instructions on how to submit predictions."
+            "ℹ️ Running local evaluation for the test split of SWE-bench Multimodal. "
+            "You may also use sb-cli (https://github.com/swe-bench/sb-cli/) to submit predictions to the hosted evaluation."
         )
-        return
 
     # set open file limit
     assert len(run_id) > 0, "Run ID must be provided"
@@ -596,12 +599,9 @@ def main(
         if not report_dir.exists():
             report_dir.mkdir(parents=True)
 
-    if force_rebuild and namespace is not None:
-        raise ValueError("Cannot force rebuild and use a namespace at the same time.")
-
     # load predictions as map of instance_id to prediction
     predictions = get_predictions_from_file(predictions_path, dataset_name, split)
-    predictions = {pred[KEY_INSTANCE_ID]: pred for pred in predictions}
+    predictions = {pred["instance_id"]: pred for pred in predictions}
 
     # get dataset from predictions
     dataset = get_dataset_from_preds(
@@ -621,49 +621,25 @@ def main(
     # run instances locally
     if platform.system() == "Linux":
         resource.setrlimit(resource.RLIMIT_NOFILE, (open_file_limit, open_file_limit))
-    client = docker.from_env()
+    client = _docker_client()
 
-    existing_images = list_images(client)
     if not dataset:
         print("No instances to run.")
+        return make_run_report(predictions, full_dataset, run_id, client, report_dir)
     else:
-        # build environment images + run instances
-        if namespace is None and not rewrite_reports:
-            build_env_images(
-                client,
-                dataset,
-                force_rebuild,
-                max_workers,
-                namespace,
-                instance_image_tag,
-                env_image_tag,
-            )
+        # run instances (images assumed to be pre-built)
         run_instances(
             predictions,
             dataset,
-            cache_level,
-            clean,
-            force_rebuild,
             max_workers,
             run_id,
             timeout,
-            namespace=namespace,
-            instance_image_tag=instance_image_tag,
-            env_image_tag=env_image_tag,
             rewrite_reports=rewrite_reports,
+            assets_dir=assets_dir,
         )
 
-    # clean images + make final report
-    clean_images(client, existing_images, cache_level, clean)
-    return make_run_report(
-        predictions,
-        full_dataset,
-        run_id,
-        client,
-        namespace,
-        instance_image_tag,
-        env_image_tag,
-    )
+    # make final report
+    return make_run_report(predictions, full_dataset, run_id, client, report_dir)
 
 
 if __name__ == "__main__":
@@ -681,7 +657,9 @@ if __name__ == "__main__":
         help="Name of dataset or path to JSON file.",
     )
     parser.add_argument(
-        "-s", "--split", type=str, default="test", help="Split of the dataset"
+        "-s",
+        "--split",
+        type=str, default="test", help="Split of the dataset"
     )
     parser.add_argument(
         "-i",
@@ -716,38 +694,11 @@ if __name__ == "__main__":
         help="Timeout (in seconds) for running tests for each instance",
     )
     parser.add_argument(
-        "--force_rebuild",
-        type=str2bool,
-        default=False,
-        help="Force rebuild of all images",
-    )
-    parser.add_argument(
-        "--cache_level",
+        "-id",
+        "--run_id",
         type=str,
-        choices=["none", "base", "env", "instance"],
-        help="Cache level - remove images above this level",
-        default="env",
-    )
-    # if clean is true then we remove all images that are above the cache level
-    # if clean is false, we only remove images above the cache level if they don't already exist
-    parser.add_argument(
-        "--clean", type=str2bool, default=False, help="Clean images above cache level"
-    )
-    parser.add_argument(
-        "-id", "--run_id", type=str, required=True, help="Run ID - identifies the run"
-    )
-    parser.add_argument(
-        "-n",
-        "--namespace",
-        type=optional_str,
-        default="swebench",
-        help='Namespace for images. (use "none" to use no namespace)',
-    )
-    parser.add_argument(
-        "--instance_image_tag", type=str, default="latest", help="Instance image tag"
-    )
-    parser.add_argument(
-        "--env_image_tag", type=str, default="latest", help="Environment image tag"
+        required=True,
+        help="Run ID - identifies the run"
     )
     parser.add_argument(
         "--rewrite_reports",
@@ -757,6 +708,16 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--report_dir", type=str, default=".", help="Directory to write reports to"
+    )
+    parser.add_argument(
+        "--assets_dir",
+        type=str,
+        default=None,
+        help=(
+            "Local mirror of a dataset's binary patch assets, laid out as "
+            "<assets_dir>/<instance_id>/<path>. Falls back to the urls in "
+            "image_assets for anything missing."
+        ),
     )
 
     # Modal execution args

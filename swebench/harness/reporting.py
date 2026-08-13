@@ -4,14 +4,13 @@ from pathlib import Path
 from typing import Optional
 
 from swebench.harness.constants import (
-    KEY_INSTANCE_ID,
-    KEY_MODEL,
-    KEY_PREDICTION,
     RUN_EVALUATION_LOG_DIR,
+    LOG_INSTANCE,
     LOG_REPORT,
+    LOG_TEST_OUTPUT,
 )
-from swebench.harness.docker_utils import list_images
-from swebench.harness.test_spec.test_spec import make_test_spec
+from swebench.harness.infra_failure import TIER_ENVIRONMENT, classify_logs
+from swebench.image_builder.docker_utils import list_images
 
 
 def make_run_report(
@@ -19,9 +18,7 @@ def make_run_report(
     full_dataset: list,
     run_id: str,
     client: Optional[docker.DockerClient] = None,
-    namespace: str = None,
-    instance_image_tag: str = "latest",
-    env_image_tag: str = "latest",
+    report_dir: str = ".",
 ) -> Path:
     """
     Make a final evaluation and run report of the instances that have been run.
@@ -45,28 +42,30 @@ def make_run_report(
     unresolved_ids = set()
     incomplete_ids = set()
     infra_failure_ids = set()
+    ambiguous_failure_ids = set()
     # get instances with empty patches
     empty_patch_ids = set()
 
     # iterate through dataset and check if the instance has been run
     for instance in full_dataset:
-        instance_id = instance[KEY_INSTANCE_ID]
+        instance_id = instance["instance_id"]
         if instance_id not in predictions:
             # skip instances without predictions
             incomplete_ids.add(instance_id)
             continue
         prediction = predictions[instance_id]
-        if prediction.get(KEY_PREDICTION, None) in ["", None]:
+        if prediction.get("model_patch", None) in ["", None]:
             empty_patch_ids.add(instance_id)
             continue
         report_file = (
             RUN_EVALUATION_LOG_DIR
             / run_id
-            / prediction[KEY_MODEL].replace("/", "__")
-            / prediction[KEY_INSTANCE_ID]
+            / prediction["model_name_or_path"].replace("/", "__")
+            / prediction["instance_id"]
             / LOG_REPORT
         )
         if report_file.exists():
+            # If report file exists, then the instance has been run
             completed_ids.add(instance_id)
             try:
                 content = report_file.read_text().strip()
@@ -75,10 +74,7 @@ def make_run_report(
                     continue
 
                 report = json.loads(content)
-                if report[instance_id].get("infra_failure"):
-                    # Record if the instance failed due to infrastructure issues
-                    infra_failure_ids.add(instance_id)
-                elif report[instance_id]["resolved"]:
+                if report[instance_id]["resolved"]:
                     # Record if the instance was resolved
                     resolved_ids.add(instance_id)
                 else:
@@ -90,22 +86,33 @@ def make_run_report(
             # Otherwise, the instance was not run successfully
             error_ids.add(instance_id)
 
+    # Classify why the non-resolved instances failed (#586). Purely additive:
+    # these ids stay in unresolved_ids/error_ids, so the denominator is unchanged.
+    infra_failure_reasons = {}
+    for instance_id in unresolved_ids | error_ids:
+        prediction = predictions[instance_id]
+        instance_log_dir = (
+            RUN_EVALUATION_LOG_DIR
+            / run_id
+            / prediction["model_name_or_path"].replace("/", "__")
+            / instance_id
+        )
+        classification = classify_logs(
+            instance_log_dir / LOG_TEST_OUTPUT, instance_log_dir / LOG_INSTANCE
+        )
+        if classification:
+            reason, tier = classification
+            infra_failure_reasons[instance_id] = reason
+            if tier == TIER_ENVIRONMENT:
+                infra_failure_ids.add(instance_id)
+            else:
+                ambiguous_failure_ids.add(instance_id)
+
     if client:
         # get remaining images and containers
         images = list_images(client)
-        test_specs = list(
-            map(
-                lambda x: make_test_spec(
-                    x,
-                    namespace=namespace,
-                    instance_image_tag=instance_image_tag,
-                    env_image_tag=env_image_tag,
-                ),
-                full_dataset,
-            )
-        )
-        for spec in test_specs:
-            image_name = spec.instance_image_key
+        for instance in full_dataset:
+            image_name = instance.get("image", "")
             if image_name in images:
                 unremoved_images.add(image_name)
         containers = client.containers.list(all=True)
@@ -114,14 +121,15 @@ def make_run_report(
                 unstopped_containers.add(container.name)
 
     # print final report
-    dataset_ids = {i[KEY_INSTANCE_ID] for i in full_dataset}
+    dataset_ids = {i["instance_id"] for i in full_dataset}
     print(f"Total instances: {len(full_dataset)}")
     print(f"Instances submitted: {len(set(predictions.keys()) & dataset_ids)}")
     print(f"Instances completed: {len(completed_ids)}")
     print(f"Instances incomplete: {len(incomplete_ids)}")
     print(f"Instances resolved: {len(resolved_ids)}")
     print(f"Instances unresolved: {len(unresolved_ids)}")
-    print(f"Instances with infrastructure failures: {len(infra_failure_ids)}")
+    print(f"Instances with likely infrastructure failures: {len(infra_failure_ids)}")
+    print(f"Instances with ambiguous failures: {len(ambiguous_failure_ids)}")
     print(f"Instances with empty patches: {len(empty_patch_ids)}")
     print(f"Instances with errors: {len(error_ids)}")
     if client:
@@ -136,6 +144,7 @@ def make_run_report(
         "resolved_instances": len(resolved_ids),
         "unresolved_instances": len(unresolved_ids),
         "infra_failure_instances": len(infra_failure_ids),
+        "ambiguous_failure_instances": len(ambiguous_failure_ids),
         "empty_patch_instances": len(empty_patch_ids),
         "error_instances": len(error_ids),
         "completed_ids": list(sorted(completed_ids)),
@@ -145,10 +154,12 @@ def make_run_report(
         "resolved_ids": list(sorted(resolved_ids)),
         "unresolved_ids": list(sorted(unresolved_ids)),
         "infra_failure_ids": list(sorted(infra_failure_ids)),
+        "ambiguous_failure_ids": list(sorted(ambiguous_failure_ids)),
+        "failure_reasons": dict(sorted(infra_failure_reasons.items())),
         "error_ids": list(sorted(error_ids)),
         "schema_version": 2,
     }
-    if not client:
+    if client:
         report.update(
             {
                 "unstopped_instances": len(unstopped_containers),
@@ -156,8 +167,10 @@ def make_run_report(
                 "unremoved_images": list(sorted(unremoved_images)),
             }
         )
-    report_file = Path(
-        list(predictions.values())[0][KEY_MODEL].replace("/", "__")
+    report_dir = Path(report_dir)
+    report_dir.mkdir(parents=True, exist_ok=True)
+    report_file = report_dir / (
+        list(predictions.values())[0]["model_name_or_path"].replace("/", "__")
         + f".{run_id}"
         + ".json"
     )

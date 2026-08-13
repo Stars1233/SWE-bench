@@ -25,13 +25,14 @@ dependencies = [
     "chardet",
     "datasets",
     "docker",
-    "ghapi",
+    "ghapi<2",  # 2.x is async: every call returns a coroutine
     "GitPython",
     "modal",
     "pre-commit",
     "python-dotenv",
     "requests",
     "rich",
+    "typer",
     "tenacity",
     "tqdm",
     "unidiff",
@@ -79,6 +80,9 @@ docs = [
 [tool.setuptools]
 include-package-data = true
 
+[project.scripts]
+swebench = "swebench.cli.cli:main"
+
 [tool.setuptools.dynamic]
 version = {attr = "swebench.__version__"}
 
@@ -91,3 +95,6 @@ namespaces = false
 "Bug Reports" = "http://github.com/swe-bench/SWE-bench/issues"
 "Source Code" = "http://github.com/swe-bench/SWE-bench"
 "Website" = "https://swebench.com"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
