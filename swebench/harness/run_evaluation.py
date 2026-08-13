@@ -147,37 +147,66 @@ def create_container(
         raise EvaluationError(test_spec.instance_id, str(e), logger) from e
 
 
-def _stage_image_assets(container, test_spec, log_dir: Path, logger) -> list[str]:
-    """Stage multimodal binary assets in the container; return restore commands.
+def _resolve_asset_bytes(asset: dict, assets_dir: Path | None, logger) -> bytes | None:
+    """Read an asset from a local mirror if present, else fetch its url.
 
-    A text test_patch cannot carry binary files (e.g. expected.png rendering
-    baselines), so the dataset ships them as urls in image_assets. The eval
-    script `rm -f`s those paths before `git apply`, so they must be restored
-    after the patch is applied rather than copied in beforehand.
+    The mirror is laid out as <assets_dir>/<instance_id>/<asset path>, which is how
+    the dataset's own dockerfile repo stores them. Nothing here is dataset-specific:
+    it only uses the `path`/`url` fields every image_assets entry carries.
     """
-    assets = (test_spec.image_assets or {}).get("test_patch") or []
+    if assets_dir is not None:
+        local = Path(assets_dir) / asset["instance_id"] / asset["path"]
+        if local.is_file():
+            return local.read_bytes()
+    try:
+        with urllib.request.urlopen(asset["url"], timeout=60) as resp:
+            return resp.read()
+    except Exception as e:
+        logger.warning(f"Could not fetch image asset {asset['url']}: {e}")
+        return None
+
+
+def _stage_image_assets(
+    container, test_spec, log_dir: Path, logger, assets_dir: Path | None = None
+) -> list[str]:
+    """Stage a patch's binary assets in the container; return restore commands.
+
+    A text patch cannot carry binary files (e.g. expected.png rendering baselines),
+    so the dataset lists them in image_assets. They must land in the working tree
+    *after* the eval script's `rm -f` + `git apply`, so they arrive with the patch
+    rather than being baked into the image -- test data in the image would be
+    visible to anything with a shell in it.
+    """
+    declared = test_spec.image_assets or {}
+    assets = []
+    for key in ("test_patch", "patch"):
+        for entry in declared.get(key) or []:
+            if entry.get("path") and entry.get("url"):
+                assets.append({**entry, "instance_id": test_spec.instance_id})
     if not assets:
         return []
     staging = Path(log_dir) / "image_assets"
     staging.mkdir(parents=True, exist_ok=True)
     container.exec_run("mkdir -p /image_assets", user="root")
-    restore = []
+    restore, from_mirror = [], 0
     for asset in assets:
-        path, url = asset.get("path"), asset.get("url")
-        if not path or not url:
+        data = _resolve_asset_bytes(asset, assets_dir, logger)
+        if data is None:
             continue
-        flat = path.replace("/", "__")
+        if assets_dir is not None and (Path(assets_dir) / asset["instance_id"] / asset["path"]).is_file():
+            from_mirror += 1
+        flat = asset["path"].replace("/", "__")
         local = staging / flat
-        try:
-            with urllib.request.urlopen(url, timeout=60) as resp:
-                local.write_bytes(resp.read())
-        except Exception as e:
-            logger.warning(f"Could not fetch image asset {url}: {e}")
-            continue
+        local.write_bytes(data)
         copy_to_container(container, local, PurePosixPath("/image_assets") / flat)
-        restore.append(f"mkdir -p $(dirname {path}) && cp /image_assets/{flat} {path}")
+        restore.append(
+            f"mkdir -p $(dirname {asset['path']}) && cp /image_assets/{flat} {asset['path']}"
+        )
     if restore:
-        logger.info(f"Staged {len(restore)} image asset(s) for restore after git apply")
+        logger.info(
+            f"Staged {len(restore)} patch asset(s) for restore after git apply "
+            f"({from_mirror} from the local mirror, {len(restore) - from_mirror} fetched)"
+        )
     return restore
 
 
@@ -200,6 +229,7 @@ def run_instance(
     timeout: int | None = None,
     rewrite_reports: bool = False,
     skip_patch: bool = False,
+    assets_dir: str | None = None,
 ):
     """
     Run a single instance with the given prediction.
@@ -315,7 +345,9 @@ def run_instance(
         # baselines). A text test_patch cannot carry them, so the dataset ships
         # them as urls in image_assets; without this the tests run against a
         # missing baseline and error out.
-        restore_cmds = _stage_image_assets(container, test_spec, log_dir, logger)
+        restore_cmds = _stage_image_assets(
+            container, test_spec, log_dir, logger, assets_dir
+        )
 
         eval_file = Path(log_dir / "eval.sh")
         eval_file.write_text(_inject_asset_restore(test_spec.eval_script, restore_cmds))
@@ -398,6 +430,7 @@ def run_instances(
     timeout: int,
     rewrite_reports: bool = False,
     skip_patch: bool = False,
+    assets_dir: str | None = None,
 ):
     """
     Run all instances for the given predictions in parallel.
@@ -426,6 +459,7 @@ def run_instances(
                 timeout,
                 rewrite_reports,
                 skip_patch,
+                assets_dir,
             )
         )
 
@@ -547,6 +581,7 @@ def main(
     rewrite_reports: bool,
     modal: bool,
     report_dir: str = ".",
+    assets_dir: str | None = None,
 ):
     """
     Run evaluation harness for the given dataset and predictions.
@@ -600,6 +635,7 @@ def main(
             run_id,
             timeout,
             rewrite_reports=rewrite_reports,
+            assets_dir=assets_dir,
         )
 
     # make final report
@@ -672,6 +708,16 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--report_dir", type=str, default=".", help="Directory to write reports to"
+    )
+    parser.add_argument(
+        "--assets_dir",
+        type=str,
+        default=None,
+        help=(
+            "Local mirror of a dataset's binary patch assets, laid out as "
+            "<assets_dir>/<instance_id>/<path>. Falls back to the urls in "
+            "image_assets for anything missing."
+        ),
     )
 
     # Modal execution args

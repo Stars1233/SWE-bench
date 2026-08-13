@@ -27,6 +27,14 @@ def eval_command(
     workers: int = typer.Option(4, "-j", "--workers", help="Instances evaluated in parallel"),
     timeout: int = typer.Option(1800, "-t", "--timeout", help="Per-instance seconds"),
     report_dir: str = typer.Option(".", "--report-dir"),
+    assets_dir: Optional[str] = typer.Option(
+        None,
+        "--assets-dir",
+        help=(
+            "Local mirror of the dataset's binary patch assets "
+            "(<assets_dir>/<instance_id>/<path>); falls back to image_assets urls"
+        ),
+    ),
     modal: bool = typer.Option(False, "--modal", help="Run on Modal instead of local Docker"),
     open_file_limit: int = typer.Option(4096, "--open-file-limit"),
 ):
@@ -61,6 +69,7 @@ def eval_command(
         rewrite_reports=False,
         modal=modal,
         report_dir=report_dir,
+        assets_dir=assets_dir,
     )
 
 
