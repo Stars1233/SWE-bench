@@ -66,8 +66,10 @@ A task repo holds one directory per instance:
 ```
 sweb.yaml                    the dataset this repo publishes, and its splits
 tasks/<instance_id>/
-    task.yaml                metadata, including which split the task is in
+    task.yaml                short metadata, including which split the task is in
+    tests.json               the tests that decide whether a patch resolved it
     problem_statement.md     the issue text shown to a model
+    hints.md                 discussion from the issue, absent when there is none
     gold.patch               the reference fix
     test.patch               the tests that grade it
     eval.sh                  the script the harness runs

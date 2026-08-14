@@ -7,7 +7,7 @@ Prior to version 1.1.0, not all deployed versions are listed, as the PyPI packag
 ## [Unreleased] - 5.0.0rc
 
 Breaking changes:
-* Task repos hold one directory per instance under `tasks/`, and a `sweb.yaml` naming the dataset they publish. Task metadata is `task.yaml`. The harness reads that tree directly: `swebench dataset build|check|diff|push` and `swebench images build|check|push` all take a task repo path as their only argument, so a command can no longer be pointed at one dataset while fed another repo.
+* Task repos hold one directory per instance under `tasks/`, and a `sweb.yaml` naming the dataset they publish. Task metadata is split by kind: `task.yaml` for the short fields, `tests.json` for FAIL_TO_PASS and PASS_TO_PASS, `problem_statement.md` and `hints.md` for prose. The harness reads that tree directly: `swebench dataset build|check|diff|push` and `swebench images build|check|push` all take a task repo path as their only argument, so a command can no longer be pointed at one dataset while fed another repo.
 * `--assets_dir` is gone. Binary patch assets come from `tasks/<instance_id>/assets/`, and no longer need a url.
 * Dataset aliases are now `full`, `verified`, `multilingual` and `multimodal`. Any other name, including a full HuggingFace id, is used as given.
 * `prepare_images.main()` takes `task_repo` instead of `dataset_name` and `split`.

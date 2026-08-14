@@ -5,6 +5,8 @@ becomes a broken instance on a leaderboard. Compiling and pushing therefore run
 the checks first rather than trusting the caller to have run them.
 """
 
+import json
+
 import pytest
 import yaml
 
@@ -35,6 +37,15 @@ def _task(repo, instance_id, split="test", **overrides):
         "PASS_TO_PASS": [],
         **overrides,
     }
+    tests = {k: meta.pop(k) for k in ("FAIL_TO_PASS", "PASS_TO_PASS") if k in meta}
+    (d / "tests.json").write_text(
+        json.dumps(
+            {
+                "FAIL_TO_PASS": tests.get("FAIL_TO_PASS", ["test_a"]),
+                "PASS_TO_PASS": tests.get("PASS_TO_PASS", []),
+            }
+        )
+    )
     (d / "task.yaml").write_text(yaml.safe_dump(meta))
     (d / "problem_statement.md").write_text("an issue")
     (d / "gold.patch").write_text("diff --git a/x b/x\n")

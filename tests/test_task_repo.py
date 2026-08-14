@@ -4,6 +4,8 @@ The tree has to round trip exactly: a patch that loses its CRLF no longer applie
 and an instance id that silently disappears shrinks a run without anyone noticing.
 """
 
+import json
+
 import pytest
 import yaml
 
@@ -36,6 +38,15 @@ def _task(repo, instance_id, **overrides):
         "split": "test",
         **overrides,
     }
+    tests = {k: meta.pop(k) for k in ("FAIL_TO_PASS", "PASS_TO_PASS") if k in meta}
+    (d / "tests.json").write_text(
+        json.dumps(
+            {
+                "FAIL_TO_PASS": tests.get("FAIL_TO_PASS", ["test_a"]),
+                "PASS_TO_PASS": tests.get("PASS_TO_PASS", []),
+            }
+        )
+    )
     (d / "task.yaml").write_text(yaml.safe_dump(meta))
     (d / "gold.patch").write_text("gold")
     (d / "problem_statement.md").write_text(f"the issue for {instance_id}")

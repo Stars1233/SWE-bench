@@ -10,6 +10,7 @@ tree itself, and never guesses at data it cannot see.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -19,6 +20,8 @@ from swebench.task_repo import (
     AS_FILE,
     CONFIG_FILE,
     TASK_FILE,
+    TEST_KEYS,
+    TESTS_FILE,
     dump_yaml,
     load_config,
     load_yaml,
@@ -29,7 +32,7 @@ from swebench.task_repo import (
 # kept in the tree but deliberately not published, e.g. instances that were dropped
 DEPRECATED_SPLIT = "deprecated"
 
-REQUIRED_FILES = (TASK_FILE, "Dockerfile", *AS_FILE.values())
+REQUIRED_FILES = (TASK_FILE, TESTS_FILE, "Dockerfile", *AS_FILE.values())
 REQUIRED_KEYS = (
     "instance_id",
     "repo",
@@ -39,8 +42,6 @@ REQUIRED_KEYS = (
     "image",
     "log_parser",
     "eval_type",
-    "FAIL_TO_PASS",
-    "PASS_TO_PASS",
 )
 # the eval script has to bracket its test output or grading cannot read the run
 EVAL_MARKERS = (">>>>> Start Test Output", ">>>>> End Test Output")
@@ -90,13 +91,27 @@ def _check_task(task_dir: Path, known_splits: set[str]) -> list[Problem]:
         problems.append(
             Problem(where, f"{TASK_FILE} instance_id is {meta['instance_id']!r}")
         )
-    for key in ("FAIL_TO_PASS", "PASS_TO_PASS"):
-        if key in meta and not isinstance(meta[key], list):
+    tests_path = task_dir / TESTS_FILE
+    if tests_path.is_file():
+        try:
+            tests = json.loads(tests_path.read_text())
+        except json.JSONDecodeError as e:
+            return [*problems, Problem(where, f"{TESTS_FILE} is not valid JSON: {e}")]
+        for key in TEST_KEYS:
+            if key not in tests:
+                problems.append(Problem(where, f"{TESTS_FILE} has no {key}"))
+            elif not isinstance(tests[key], list):
+                problems.append(
+                    Problem(where, f"{key} is {type(tests[key]).__name__}, not a list")
+                )
+            elif not all(isinstance(t, str) for t in tests[key]):
+                problems.append(
+                    Problem(where, f"{key} holds something that is not a string")
+                )
+        if tests.get(TEST_KEYS[0]) == [] and meta.get("split") != DEPRECATED_SPLIT:
             problems.append(
-                Problem(where, f"{key} is {type(meta[key]).__name__}, not a list")
+                Problem(where, "no FAIL_TO_PASS, so nothing grades this task")
             )
-    if meta.get("FAIL_TO_PASS") == [] and meta.get("split") != DEPRECATED_SPLIT:
-        problems.append(Problem(where, "no FAIL_TO_PASS, so nothing grades this task"))
 
     split = meta.get("split")
     if split is not None and split not in known_splits | {DEPRECATED_SPLIT}:

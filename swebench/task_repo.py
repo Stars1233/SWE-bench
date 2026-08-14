@@ -4,8 +4,10 @@ A task repo holds one directory per instance::
 
     sweb.yaml             the dataset this repo publishes, and its splits
     tasks/<instance_id>/
-        task.yaml             metadata, including which split the task is in
+        task.yaml             short metadata, including which split the task is in
+        tests.json            the tests that decide whether a patch resolved it
         problem_statement.md  the issue text shown to a model
+        hints.md              discussion from the issue, absent when there is none
         gold.patch            the reference fix
         test.patch            the tests that grade it
         eval.sh               the script the harness runs
@@ -18,6 +20,7 @@ which is what makes local development of a new dataset possible.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import yaml
@@ -32,6 +35,12 @@ AS_FILE = {
     "eval_script": "eval.sh",
     "problem_statement": "problem_statement.md",
 }
+# written only when non-empty, so an empty file never stands in for missing prose
+OPTIONAL_FILE = {"hints_text": "hints.md"}
+# JSON rather than YAML: these are arbitrary strings, sometimes pasted in by hand,
+# and JSON has no implicit typing to turn `no` or `1.0` into something else
+TESTS_FILE = "tests.json"
+TEST_KEYS = ("FAIL_TO_PASS", "PASS_TO_PASS")
 CONFIG_FILE = "sweb.yaml"
 TASK_FILE = "task.yaml"
 
@@ -81,12 +90,20 @@ def task_dirs(repo_path: str | Path) -> list[Path]:
     )
 
 
+def dump_tests(tests: dict) -> str:
+    return json.dumps(tests, indent=2, ensure_ascii=False) + "\n"
+
+
 def load_task(task_dir: str | Path) -> dict:
     """One task directory, as the instance dict the harness expects."""
     task_dir = Path(task_dir)
     instance = load_yaml(task_dir / TASK_FILE)
     for column, filename in AS_FILE.items():
         instance[column] = _read(task_dir / filename)
+    for column, filename in OPTIONAL_FILE.items():
+        path = task_dir / filename
+        instance[column] = _read(path) if path.is_file() else ""
+    instance.update(json.loads((task_dir / TESTS_FILE).read_text()))
     return instance
 
 
