@@ -569,6 +569,57 @@ def get_dataset_from_preds(
     return dataset
 
 
+def _build_before_eval(dataset, dataset_name, split, dockerfile_repo, max_workers, client):
+    """Build this run's images from a dockerfile repo instead of trusting the registry.
+
+    Without this a failed build is invisible: the image is pulled instead, so a stale
+    published image can report a clean pass. Verification is by the image name the
+    evaluation will actually use, so a naming mismatch cannot pass for a build.
+    """
+    from swebench.image_builder.docker_build import build_instance_images
+    from swebench.image_builder.image_spec import get_image_specs_from_dataset
+    from swebench.image_builder.prepare_images import (
+        DOCKERFILES_SUBDIR,
+        load_dockerfiles_from_dir,
+        resolve_dockerfile_repo,
+    )
+
+    wanted = {d["instance_id"]: make_test_spec(d).image for d in dataset}
+    # namespace and tag come from the image the dataset names, so built tags match
+    sample = next(iter(wanted.values()))
+    namespace = sample.split("/")[0] if "/" in sample else None
+    tag = sample.rsplit(":", 1)[1] if ":" in sample.rsplit("/", 1)[-1] else "latest"
+
+    print(f"Building {len(wanted)} image(s) from {dockerfile_repo} before evaluating...")
+    with resolve_dockerfile_repo(dockerfile_repo) as repo_path:
+        dockerfiles = load_dockerfiles_from_dir(repo_path / DOCKERFILES_SUBDIR)
+    image_specs = get_image_specs_from_dataset(dataset, dockerfiles, namespace, tag)
+    if not image_specs:
+        print("No Dockerfiles matched these instances; nothing was built.")
+    else:
+        build_instance_images(
+            client=client, image_specs=image_specs, force_rebuild=True, max_workers=max_workers
+        )
+
+    # trust the registry only where a build did not produce the image
+    missing = []
+    for iid, image in wanted.items():
+        try:
+            client.images.get(image)
+        except docker.errors.ImageNotFound:
+            missing.append((iid, image))
+    if not missing:
+        print(f"Built {len(wanted)} image(s) locally; none pulled.")
+        return
+    print(f"BUILD FAILED for {len(missing)} instance(s): {', '.join(i for i, _ in sorted(missing))}")
+    for iid, image in missing:
+        try:
+            client.images.pull(image)
+            print(f"  {iid}: build failed; FELL BACK to the published image {image}")
+        except docker.errors.ImageNotFound:
+            print(f"  {iid}: build failed and no published image exists; it will error")
+
+
 def main(
     dataset_name: str,
     split: str,
@@ -582,6 +633,7 @@ def main(
     modal: bool,
     report_dir: str = ".",
     assets_dir: str | None = None,
+    dockerfile_repo: str | None = None,
 ):
     """
     Run evaluation harness for the given dataset and predictions.
@@ -627,6 +679,10 @@ def main(
         print("No instances to run.")
         return make_run_report(predictions, full_dataset, run_id, client, report_dir)
     else:
+        if dockerfile_repo:
+            _build_before_eval(
+                dataset, dataset_name, split, dockerfile_repo, max_workers, client
+            )
         # run instances (images assumed to be pre-built)
         run_instances(
             predictions,

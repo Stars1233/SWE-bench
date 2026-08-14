@@ -35,6 +35,16 @@ def eval_command(
             "(<assets_dir>/<instance_id>/<path>); falls back to image_assets urls"
         ),
     ),
+    dockerfile_repo: Optional[str] = typer.Option(
+        None,
+        "--dockerfile-repo",
+        help=(
+            "Build images from this dockerfile repo instead of trusting the registry. "
+            "Without it images are pulled, so a stale published image can mask a broken "
+            "build; failed builds are reported and only fall back to a published image "
+            "when one exists."
+        ),
+    ),
     modal: bool = typer.Option(False, "--modal", help="Run on Modal instead of local Docker"),
     open_file_limit: int = typer.Option(4096, "--open-file-limit"),
 ):
@@ -70,6 +80,7 @@ def eval_command(
         modal=modal,
         report_dir=report_dir,
         assets_dir=assets_dir,
+        dockerfile_repo=dockerfile_repo,
     )
 
 
