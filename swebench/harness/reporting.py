@@ -5,8 +5,11 @@ from typing import Optional
 
 from swebench.harness.constants import (
     RUN_EVALUATION_LOG_DIR,
+    LOG_INSTANCE,
     LOG_REPORT,
+    LOG_TEST_OUTPUT,
 )
+from swebench.harness.infra_failure import TIER_ENVIRONMENT, classify_logs
 from swebench.image_builder.docker_utils import list_images
 
 
@@ -38,6 +41,8 @@ def make_run_report(
     unremoved_images = set()
     unresolved_ids = set()
     incomplete_ids = set()
+    infra_failure_ids = set()
+    ambiguous_failure_ids = set()
     # get instances with empty patches
     empty_patch_ids = set()
 
@@ -62,15 +67,46 @@ def make_run_report(
         if report_file.exists():
             # If report file exists, then the instance has been run
             completed_ids.add(instance_id)
-            report = json.loads(report_file.read_text())
-            if report[instance_id]["resolved"]:
-                # Record if the instance was resolved
-                resolved_ids.add(instance_id)
-            else:
-                unresolved_ids.add(instance_id)
+            try:
+                content = report_file.read_text().strip()
+                if not content:  # Empty file
+                    error_ids.add(instance_id)
+                    continue
+
+                report = json.loads(content)
+                if report[instance_id]["resolved"]:
+                    # Record if the instance was resolved
+                    resolved_ids.add(instance_id)
+                else:
+                    unresolved_ids.add(instance_id)
+            except (json.JSONDecodeError, KeyError):
+                # If the report file is not valid JSON or missing keys, treat as error
+                error_ids.add(instance_id)
         else:
             # Otherwise, the instance was not run successfully
             error_ids.add(instance_id)
+
+    # Classify why the non-resolved instances failed (#586). Purely additive:
+    # these ids stay in unresolved_ids/error_ids, so the denominator is unchanged.
+    infra_failure_reasons = {}
+    for instance_id in unresolved_ids | error_ids:
+        prediction = predictions[instance_id]
+        instance_log_dir = (
+            RUN_EVALUATION_LOG_DIR
+            / run_id
+            / prediction["model_name_or_path"].replace("/", "__")
+            / instance_id
+        )
+        classification = classify_logs(
+            instance_log_dir / LOG_TEST_OUTPUT, instance_log_dir / LOG_INSTANCE
+        )
+        if classification:
+            reason, tier = classification
+            infra_failure_reasons[instance_id] = reason
+            if tier == TIER_ENVIRONMENT:
+                infra_failure_ids.add(instance_id)
+            else:
+                ambiguous_failure_ids.add(instance_id)
 
     if client:
         # get remaining images and containers
@@ -92,6 +128,8 @@ def make_run_report(
     print(f"Instances incomplete: {len(incomplete_ids)}")
     print(f"Instances resolved: {len(resolved_ids)}")
     print(f"Instances unresolved: {len(unresolved_ids)}")
+    print(f"Instances with likely infrastructure failures: {len(infra_failure_ids)}")
+    print(f"Instances with ambiguous failures: {len(ambiguous_failure_ids)}")
     print(f"Instances with empty patches: {len(empty_patch_ids)}")
     print(f"Instances with errors: {len(error_ids)}")
     if client:
@@ -105,6 +143,8 @@ def make_run_report(
         "completed_instances": len(completed_ids),
         "resolved_instances": len(resolved_ids),
         "unresolved_instances": len(unresolved_ids),
+        "infra_failure_instances": len(infra_failure_ids),
+        "ambiguous_failure_instances": len(ambiguous_failure_ids),
         "empty_patch_instances": len(empty_patch_ids),
         "error_instances": len(error_ids),
         "completed_ids": list(sorted(completed_ids)),
@@ -113,6 +153,9 @@ def make_run_report(
         "submitted_ids": list(sorted(predictions.keys())),
         "resolved_ids": list(sorted(resolved_ids)),
         "unresolved_ids": list(sorted(unresolved_ids)),
+        "infra_failure_ids": list(sorted(infra_failure_ids)),
+        "ambiguous_failure_ids": list(sorted(ambiguous_failure_ids)),
+        "failure_reasons": dict(sorted(infra_failure_reasons.items())),
         "error_ids": list(sorted(error_ids)),
         "schema_version": 2,
     }
