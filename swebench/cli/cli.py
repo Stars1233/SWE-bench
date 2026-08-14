@@ -23,7 +23,6 @@ app = typer.Typer(
     swebench images clean --run-id my-run
     swebench dataset build multimodal -s test
     swebench dataset collect scikit-learn/scikit-learn
-    swebench dataset versions tasks/scikit-learn-task-instances.jsonl
 """,
     no_args_is_help=True,
     pretty_exceptions_enable=False,

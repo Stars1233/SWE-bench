@@ -63,7 +63,7 @@ Determining a version for each task instance can be accomplished in a number of 
 * Scrape from web: Repositories with websites (i.e. [xarray.dev](https://xarray.dev/)) have a "Releases" or "What's New" page (i.e. [release page](https://docs.xarray.dev/en/stable/whats-new.html) for xarray). This can be scraped for information.
 * Build from code: Sometimes, version-related files (i.e. `_version.py`) are purposely omitted by a developer (check `.gitignore` to verify). In this case, per task instance you can build the repository source code locally and extract the version number from the built codebase.
 
-Examples and technical details for each are included in `/versioning/`. Please refer to them as needed.
+Versioning tooling now lives with the task data, at [swe-bench-dockerfiles/src/versioning](https://github.com/SWE-bench/swe-bench-dockerfiles/tree/main/src/versioning).
 
 ### Part B: Installation Configurations
 Per repository, you must provide installation instructions per version. In `constants.py`...

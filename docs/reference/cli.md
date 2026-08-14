@@ -84,15 +84,8 @@ swebench dataset collect scikit-learn/scikit-learn
 swebench dataset collect psf/requests --max-pulls 200 --cutoff-date 20230101
 ```
 
-### `swebench dataset versions INSTANCES_PATH`
-
-Attach a version to each candidate instance. Install specs are keyed by version,
-so instances without one cannot be built.
-
-```bash
-swebench dataset versions tasks/scikit-learn-task-instances.jsonl
-swebench dataset versions tasks/foo.jsonl --retrieval-method build --testbed /tmp/tb
-```
+Versioning candidate instances is no longer part of this CLI. That tooling lives with
+the task data, at [swe-bench-dockerfiles/src/versioning](https://github.com/SWE-bench/swe-bench-dockerfiles/tree/main/src/versioning).
 
 ## Older invocations
 

@@ -16,7 +16,6 @@ This directory contains comprehensive documentation for SWE-bench.
 - **reference/**: Detailed API and technical references
   - **harness/**: Documentation for the evaluation harness
   - **inference/**: Documentation for model inference
-  - **versioning.md**: Explanation of the versioning system
 - **api/**: API documentation (reserved for future use)
 
 ## Documentation Maintenance

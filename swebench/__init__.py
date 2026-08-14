@@ -22,33 +22,9 @@ _LAZY_IMPORTS = {
     "PARSER_REGISTRY": ("swebench.harness.log_parsers", "PARSER_REGISTRY"),
     "run_evaluation": ("swebench.harness.run_evaluation", "main"),
     "run_threadpool": ("swebench.harness.utils", "run_threadpool"),
-    "MAP_REPO_TO_VERSION_PATHS": (
-        "swebench.versioning.constants",
-        "MAP_REPO_TO_VERSION_PATHS",
-    ),
-    "MAP_REPO_TO_VERSION_PATTERNS": (
-        "swebench.versioning.constants",
-        "MAP_REPO_TO_VERSION_PATTERNS",
-    ),
-    "get_version": ("swebench.versioning.get_versions", "get_version"),
-    "get_versions_from_build": (
-        "swebench.versioning.get_versions",
-        "get_versions_from_build",
-    ),
-    "get_versions_from_web": (
-        "swebench.versioning.get_versions",
-        "get_versions_from_web",
-    ),
-    "map_version_to_task_instances": (
-        "swebench.versioning.get_versions",
-        "map_version_to_task_instances",
-    ),
-    "split_instances": ("swebench.versioning.utils", "split_instances"),
 }
 
 __all__ = [
-    "MAP_REPO_TO_VERSION_PATHS",
-    "MAP_REPO_TO_VERSION_PATTERNS",
     "PARSER_REGISTRY",
     "ResolvedStatus",
     "SWEbenchInstance",
@@ -65,14 +41,9 @@ __all__ = [
     "get_eval_report",
     "get_resolution_status",
     "get_tasks_pipeline",
-    "get_version",
-    "get_versions_from_build",
-    "get_versions_from_web",
-    "map_version_to_task_instances",
     "print_pulls",
     "run_evaluation",
     "run_threadpool",
-    "split_instances",
 ]
 
 

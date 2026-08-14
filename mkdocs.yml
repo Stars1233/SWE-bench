@@ -67,11 +67,9 @@ nav:
       - "CLI": reference/cli.md
       - "The Harness": reference/harness.md
       - "Inference": reference/inference.md
-      - "Versioning": reference/versioning.md
     - "API":
       - "Harness": api/harness.md
       - "Inference": api/inference.md
-      - "Versioning": api/versioning.md
 plugins:
    - blog
    - glightbox

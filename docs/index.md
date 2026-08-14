@@ -78,7 +78,6 @@ pip install -e .
 - **Reference**
   - [Harness API](reference/harness.md) - Documentation for the evaluation harness
   - [Inference API](reference/inference.md) - Documentation for model inference
-  - [Versioning](reference/versioning.md) - Documentation for versioning
 - **[FAQ](faq.md)** - Frequently asked questions
 
 ## ⬇️ Available Resources

@@ -4,6 +4,49 @@ All notable changes to the PyPI package for SWE-bench ([`swebench`](https://pypi
 
 Prior to version 1.1.0, not all deployed versions are listed, as the PyPI package was going through development and testing. The noteworthy versions and the respective changes that were introduced by that version are included. All versions 1.1.0 onwards are fully listed.
 
+## [Unreleased] - 5.0.0rc
+
+Breaking changes:
+* `swebench.versioning` moved out of this repo, to [swe-bench-dockerfiles/src/versioning](https://github.com/SWE-bench/swe-bench-dockerfiles/tree/main/src/versioning). It builds datasets rather than running them, and only works for the original Python repos. The `swebench dataset versions` command and seven `swebench.*` version helpers are gone with it.
+* Names in the `swebench` namespace are now loaded on first use. Everything importable before still is, but `import swebench` no longer pulls in bs4, docker, datasets and modal.
+* Datasets carry their own `eval_script` and metadata, so the harness no longer needs a Dockerfile repo checkout to evaluate.
+* Image building moved to `swebench.image_builder`, with an `ImageSpec` that supports amd64 and arm64. `TestSpec` now assumes images already exist.
+* Committed dataset parquets removed. HuggingFace is the source of truth.
+
+Added:
+* A `swebench` CLI, with grouped commands and worked examples in the help text.
+* SWE-bench Multimodal test-split support, including its log parsers and image assets. `--assets_dir` loads binary assets from disk when a URL has gone stale.
+
+Fixed grading:
+* A patch can no longer pass by printing its own `PASSED` lines. The eval script records the test command's exit code, and a log claiming no failures while the tests failed is not graded (#620).
+* A run with no results and no sign the suite ran is rejected rather than scored as resolved.
+* Infrastructure failures are labelled in the report, without being removed from the score (#586).
+* Truncated parametrized test ids, skipped tests, results outside the output markers, and test names containing spaces are all handled.
+* `report_dir` is honored; reports no longer land in the checkout.
+
+## [4.1.0] - 9/11/2025
+* #471 Fix git log leakage in environment images
+* #427 Correct log parsing for patch application
+* #463 Fix image removal for namespaces containing `/`
+* #459 `instance_ids` are space separated, not comma separated
+* #456 Extra validation for `make_run_report`
+* Nicer logging for `run_evaluation`
+
+## [4.0.1] - 5/6/2025
+* #392 Support multilingual evaluation
+* #358 Preserve all issue references sharing a keyword in PRs
+* #390 Fix loading of jsonl data
+* #370 Progress bar updates immediately when futures fail
+* #369 Fix `prompt_col` generation in `create_text_dataset.py`
+
+## [3.0.0] - 1/13/2025
+* #285 SWE-bench Multimodal dev split
+* #376 Fix missing text column
+* #353 Clean diff after setup
+* #366 Catch-all exception for docker pull
+* #338 Fix logic error in old-style pytest parsing
+* Paused support for SWE-bench task creation
+
 ## [2.0.12] - 7/21/2024
 * Minor naming changes
 * #186 fix: correct some typings and a incorrect function call
