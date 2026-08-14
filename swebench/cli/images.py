@@ -29,7 +29,9 @@ def build(
     force_rebuild: bool = typer.Option(False, "--force-rebuild"),
     namespace: Optional[str] = typer.Option(None, "-n", "--namespace", help="Registry namespace to tag for"),
     tag: str = typer.Option("latest", "--tag"),
-    dockerfile_repo: Optional[str] = typer.Option(None, "--dockerfile-repo", help="Path or GitHub ref"),
+    task_repo: Optional[str] = typer.Option(
+        None, "--task-repo", "--dockerfile-repo", help="Path or GitHub ref"
+    ),
     dry_run: bool = typer.Option(False, "--dry-run", help="List what would be built"),
     open_file_limit: int = typer.Option(4096, "--open-file-limit"),
 ):
@@ -58,7 +60,7 @@ def build(
         namespace=namespace,
         tag=tag,
         dry_run=dry_run,
-        dockerfile_repo=dockerfile_repo,
+        task_repo=task_repo,
     )
 
 

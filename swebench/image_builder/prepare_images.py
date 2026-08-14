@@ -36,25 +36,25 @@ def load_dockerfiles_from_dir(dockerfiles_dir: Path) -> dict[str, str]:
     return dockerfiles
 
 
-def _is_github_ref(dockerfile_repo: str) -> bool:
-    """Check if the dockerfile_repo is a GitHub reference (not a local path)."""
-    if re.match(r"^https?://github\.com/", dockerfile_repo):
+def _is_github_ref(task_repo: str) -> bool:
+    """Check if the task_repo is a GitHub reference (not a local path)."""
+    if re.match(r"^https?://github\.com/", task_repo):
         return True
-    if re.match(r"^[\w.-]+/[\w.-]+$", dockerfile_repo) and not Path(dockerfile_repo).is_dir():
+    if re.match(r"^[\w.-]+/[\w.-]+$", task_repo) and not Path(task_repo).is_dir():
         return True
     return False
 
 
-def _github_ref_to_urls(dockerfile_repo: str) -> list[str]:
+def _github_ref_to_urls(task_repo: str) -> list[str]:
     """Convert a GitHub reference to clone URLs (SSH first, then HTTPS fallback)."""
-    if re.match(r"^https?://github\.com/", dockerfile_repo):
+    if re.match(r"^https?://github\.com/", task_repo):
         # Extract owner/repo from URL
-        match = re.match(r"^https?://github\.com/([\w.-]+/[\w.-]+?)(?:\.git)?/?$", dockerfile_repo)
+        match = re.match(r"^https?://github\.com/([\w.-]+/[\w.-]+?)(?:\.git)?/?$", task_repo)
         if not match:
-            return [dockerfile_repo.rstrip("/") + ".git"]
+            return [task_repo.rstrip("/") + ".git"]
         owner_repo = match.group(1)
     else:
-        owner_repo = dockerfile_repo
+        owner_repo = task_repo
     return [
         f"git@github.com:{owner_repo}.git",
         f"https://github.com/{owner_repo}.git",
@@ -62,7 +62,7 @@ def _github_ref_to_urls(dockerfile_repo: str) -> list[str]:
 
 
 @contextmanager
-def resolve_dockerfile_repo(dockerfile_repo: str):
+def resolve_task_repo(task_repo: str):
     """
     Resolve a dockerfile repo reference to a local path.
 
@@ -73,14 +73,14 @@ def resolve_dockerfile_repo(dockerfile_repo: str):
 
     Yields the local Path to the repo root.
     """
-    if not _is_github_ref(dockerfile_repo):
-        repo_path = Path(dockerfile_repo)
+    if not _is_github_ref(task_repo):
+        repo_path = Path(task_repo)
         if not repo_path.is_dir():
-            raise FileNotFoundError(f"Local dockerfile repo not found: {dockerfile_repo}")
+            raise FileNotFoundError(f"Local dockerfile repo not found: {task_repo}")
         yield repo_path
         return
 
-    clone_urls = _github_ref_to_urls(dockerfile_repo)
+    clone_urls = _github_ref_to_urls(task_repo)
     with tempfile.TemporaryDirectory() as tmpdir:
         for i, clone_url in enumerate(clone_urls):
             print(f"Cloning dockerfile repo from {clone_url}...")
@@ -130,7 +130,7 @@ def main(
     namespace,
     tag,
     dry_run,
-    dockerfile_repo,
+    task_repo,
 ):
     """
     Build Docker images for the specified instances.
@@ -145,14 +145,14 @@ def main(
         namespace (str): Docker registry namespace.
         tag (str): Docker image tag.
         dry_run (bool): If True, create docker files and build contexts but don't build images.
-        dockerfile_repo (str): Dockerfile repo reference — a local path, GitHub "owner/repo", or GitHub URL.
+        task_repo (str): Dockerfile repo reference — a local path, GitHub "owner/repo", or GitHub URL.
     """
     # Set open file limit
     resource.setrlimit(resource.RLIMIT_NOFILE, (open_file_limit, open_file_limit))
     client = docker.from_env(timeout=600)
 
     # Load pre-generated dockerfiles
-    with resolve_dockerfile_repo(dockerfile_repo) as repo_path:
+    with resolve_task_repo(task_repo) as repo_path:
         dockerfiles_dir = repo_path / DOCKERFILES_SUBDIR
         dockerfiles = load_dockerfiles_from_dir(dockerfiles_dir)
 
@@ -228,7 +228,7 @@ if __name__ == "__main__":
         help="Create docker files and build contexts but don't build images",
     )
     parser.add_argument(
-        "--dockerfile_repo",
+        "--task_repo",
         type=str,
         required=True,
         help="Dockerfile repo: local path, GitHub 'owner/repo', or 'https://github.com/owner/repo'",

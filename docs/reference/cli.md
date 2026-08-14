@@ -63,17 +63,17 @@ partially-pushed image set in seconds rather than one instance at a time.
 
 Regenerate a dataset's parquet. This joins the public columns from HuggingFace
 with the `eval_script`, `log_parser`, `eval_type` and `image` fields produced by
-the dockerfile repositories' generators. Run it after changing a generator, then
+the task data repositories' generators. Run it after changing a generator, then
 push the result to HuggingFace.
 
 ```bash
 swebench dataset build multimodal -s test
-swebench dataset build verified --dockerfile-repos ~/code
+swebench dataset build verified --task-repos ~/code
 ```
 
 It expects the `swe-bench-dockerfiles`, `swe-bench-multilingual-dockerfiles` and
-`swe-bench-multimodal-dockerfiles` checkouts, found via `--dockerfile-repos` or
-`SWEBENCH_DOCKERFILE_REPOS`.
+`swe-bench-multimodal-dockerfiles` checkouts, found via `--task-repos` or
+`SWEBENCH_TASK_REPOS`.
 
 ### `swebench dataset collect REPOS...`
 

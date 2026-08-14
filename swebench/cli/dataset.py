@@ -21,8 +21,11 @@ def build(
     ),
     split: Optional[list[str]] = typer.Option(None, "-s", "--split", help="Splits to build (repeatable)"),
     out: Optional[str] = typer.Option(None, "-o", "--out", help="Output directory (default: ./data)"),
-    dockerfile_repos: Optional[str] = typer.Option(
-        None, "--dockerfile-repos", help="Directory holding the swe-bench-*-dockerfiles checkouts"
+    task_repos: Optional[str] = typer.Option(
+        None,
+        "--task-repos",
+        "--dockerfile-repos",
+        help="Directory holding the swe-bench task data repo checkouts",
     ),
 ):
     """Regenerate a dataset's parquet, including the fields the harness reads.
@@ -36,15 +39,15 @@ def build(
 
         swebench dataset build multimodal -s test
 
-        swebench dataset build verified --dockerfile-repos ~/code
+        swebench dataset build verified --task-repos ~/code
 
         swebench dataset build lite -s dev -s test -o /tmp/out
     """
     import os
     from pathlib import Path
 
-    if dockerfile_repos:
-        os.environ["SWEBENCH_DOCKERFILE_REPOS"] = dockerfile_repos
+    if task_repos:
+        os.environ["SWEBENCH_TASK_REPOS"] = task_repos
     if out:
         os.environ["SWEBENCH_DATA_DIR"] = out
 

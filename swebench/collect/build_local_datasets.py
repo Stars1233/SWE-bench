@@ -19,8 +19,13 @@ from datasets import load_dataset
 # the three sb_dockerfile_gen packages).
 # ---------------------------------------------------------------------------
 
-# override with SWEBENCH_DOCKERFILE_REPOS=/path/to/checkouts
-_REPO_ROOT = Path(os.environ.get("SWEBENCH_DOCKERFILE_REPOS", Path.home() / "code"))
+# override with SWEBENCH_TASK_REPOS=/path/to/checkouts
+# SWEBENCH_DOCKERFILE_REPOS is the old name, still honoured
+_REPO_ROOT = Path(
+    os.environ.get("SWEBENCH_TASK_REPOS")
+    or os.environ.get("SWEBENCH_DOCKERFILE_REPOS")
+    or Path.home() / "code"
+)
 DOCKERFILE_REPOS = {
     "og": _REPO_ROOT / "swe-bench-dockerfiles",
     "multilingual": _REPO_ROOT / "swe-bench-multilingual-dockerfiles",

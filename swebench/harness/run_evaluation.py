@@ -569,7 +569,7 @@ def get_dataset_from_preds(
     return dataset
 
 
-def _build_before_eval(dataset, dataset_name, split, dockerfile_repo, max_workers, client):
+def _build_before_eval(dataset, dataset_name, split, task_repo, max_workers, client):
     """Build this run's images from a dockerfile repo instead of trusting the registry.
 
     Without this a failed build is invisible: the image is pulled instead, so a stale
@@ -581,7 +581,7 @@ def _build_before_eval(dataset, dataset_name, split, dockerfile_repo, max_worker
     from swebench.image_builder.prepare_images import (
         DOCKERFILES_SUBDIR,
         load_dockerfiles_from_dir,
-        resolve_dockerfile_repo,
+        resolve_task_repo,
     )
 
     wanted = {d["instance_id"]: make_test_spec(d).image for d in dataset}
@@ -590,8 +590,8 @@ def _build_before_eval(dataset, dataset_name, split, dockerfile_repo, max_worker
     namespace = sample.split("/")[0] if "/" in sample else None
     tag = sample.rsplit(":", 1)[1] if ":" in sample.rsplit("/", 1)[-1] else "latest"
 
-    print(f"Building {len(wanted)} image(s) from {dockerfile_repo} before evaluating...")
-    with resolve_dockerfile_repo(dockerfile_repo) as repo_path:
+    print(f"Building {len(wanted)} image(s) from {task_repo} before evaluating...")
+    with resolve_task_repo(task_repo) as repo_path:
         dockerfiles = load_dockerfiles_from_dir(repo_path / DOCKERFILES_SUBDIR)
     image_specs = get_image_specs_from_dataset(dataset, dockerfiles, namespace, tag)
     if not image_specs:
@@ -633,7 +633,7 @@ def main(
     modal: bool,
     report_dir: str = ".",
     assets_dir: str | None = None,
-    dockerfile_repo: str | None = None,
+    task_repo: str | None = None,
 ):
     """
     Run evaluation harness for the given dataset and predictions.
@@ -679,9 +679,9 @@ def main(
         print("No instances to run.")
         return make_run_report(predictions, full_dataset, run_id, client, report_dir)
     else:
-        if dockerfile_repo:
+        if task_repo:
             _build_before_eval(
-                dataset, dataset_name, split, dockerfile_repo, max_workers, client
+                dataset, dataset_name, split, task_repo, max_workers, client
             )
         # run instances (images assumed to be pre-built)
         run_instances(

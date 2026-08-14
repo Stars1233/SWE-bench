@@ -35,8 +35,9 @@ def eval_command(
             "(<assets_dir>/<instance_id>/<path>); falls back to image_assets urls"
         ),
     ),
-    dockerfile_repo: Optional[str] = typer.Option(
+    task_repo: Optional[str] = typer.Option(
         None,
+        "--task-repo",
         "--dockerfile-repo",
         help=(
             "Build images from this dockerfile repo instead of trusting the registry. "
@@ -80,7 +81,7 @@ def eval_command(
         modal=modal,
         report_dir=report_dir,
         assets_dir=assets_dir,
-        dockerfile_repo=dockerfile_repo,
+        task_repo=task_repo,
     )
 
 
