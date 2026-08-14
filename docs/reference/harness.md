@@ -177,7 +177,7 @@ The harness generates logs in two directories:
 - `logs/build_images`: Docker build logs
 - `logs/run_evaluation`: Evaluation run logs
 
-Final evaluation results are stored in the `evaluation_results` directory.
+The run summary is written to `<model>.<run_id>.json` in the directory you ran from, and per-instance logs to `logs/run_evaluation/`.
 
 ## Troubleshooting
 

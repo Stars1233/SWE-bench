@@ -136,19 +136,50 @@ python -m swebench.harness.run_evaluation \
 
 ## Understanding Evaluation Results
 
-The evaluation results are stored in the `evaluation_results` directory, with subdirectories for each run. Each run produces:
+A run writes two things.
 
-- `results.json`: Overall evaluation metrics
-- `instance_results.jsonl`: Detailed results for each instance
-- `run_logs/`: Logs for each evaluation instance
+A summary file in the directory you ran from, named `<model>.<run_id>.json`. Pass `--report_dir` to put it somewhere else.
 
-Key metrics include:
+A folder per instance, at `logs/run_evaluation/<run_id>/<model>/<instance_id>/`:
 
-- **Total instances**: Number of instances in the dataset
-- **Instances submitted**: Number of instances the model attempted
-- **Instances completed**: Number of instances that completed evaluation
-- **Instances resolved**: Number of instances where the patch fixed the issue
-- **Resolution rate**: Percentage of submitted instances successfully resolved
+| File | What it holds |
+| --- | --- |
+| `report.json` | The result for that one instance |
+| `test_output.txt` | Everything the tests printed |
+| `run_instance.log` | What the harness did, and why it stopped if it failed |
+| `eval.sh` | The script that ran the tests |
+| `patch.diff` | The patch that was applied |
+
+### What the counts mean
+
+| Field | Meaning |
+| --- | --- |
+| Total instances | Tasks in the dataset you chose |
+| Instances submitted | Predictions you gave it |
+| Instances completed | Instances that produced a `report.json` |
+| Instances incomplete | In the dataset, but you gave no prediction for them |
+| Instances resolved | The patch made the required tests pass |
+| Instances unresolved | The tests ran, but did not pass |
+| Instances with empty patches | The prediction was empty, so nothing ran |
+| Instances with errors | No result could be produced at all |
+| Instances with likely infrastructure failures | Failed for an environment reason, such as a browser that never started |
+| Instances with ambiguous failures | Failed for a reason that could be the environment or the patch |
+| Unstopped containers, Unremoved images | Docker leftovers, not results |
+
+Resolved plus unresolved is how many were actually graded. The two failure lines are
+counted inside unresolved and errors as well, so they never remove anything from the total.
+
+### Why "ran successfully" can disagree with the error count
+
+While a run is going you see a line like `40 ran successfully, 0 failed`. That counts
+crashes in the harness. A failed evaluation is not a crash: the harness catches the
+problem, writes it to the log, and carries on.
+
+`Instances with errors` counts something else: instances with no `report.json`. The usual
+causes are a patch that did not apply, a container that did not start, or a run that timed out.
+
+So `0 failed` together with `Instances with errors: 1` means nothing crashed, and one
+instance could not be graded. Read that instance's `run_instance.log` to see why.
 
 ## Troubleshooting
 

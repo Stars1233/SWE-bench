@@ -105,7 +105,7 @@ python -m swebench.harness.run_evaluation \
 
 このコマンドは、現在のディレクトリにdockerビルドログ（`logs/build_images`）と評価ログ（`logs/run_evaluation`）を生成します。
 
-最終的な評価結果は`evaluation_results`ディレクトリに保存されます。
+最終的な評価結果は`logs/run_evaluation`ディレクトリに保存されます。
 
 評価ハーネスの引数の完全なリストを確認するには、以下を実行してください：
 ```bash

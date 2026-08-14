@@ -104,7 +104,7 @@ python -m swebench.harness.run_evaluation \
 
 这个命令将在当前目录中生成docker构建日志(`logs/build_images`)和评估日志(`logs/run_evaluation`)。
 
-最终的评估结果将存储在`evaluation_results`目录中。
+最终的评估结果将存储在`logs/run_evaluation`目录中。
 
 要查看评估工具的完整参数列表,请运行:
 ```bash
