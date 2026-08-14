@@ -54,7 +54,7 @@ This step is the most manual of all parts.
 To create an appropriate execution environment for task instances from a new repository, you must do the following steps:
 * Assign a repository-specific *version* (i.e. `1.2`) to every task instance.
 * Specify repository+version-specific installation commands in the matching task data repository
-  (`swe-bench-dockerfiles`, `swe-bench-multilingual-dockerfiles`, `swe-bench-multimodal-dockerfiles`),
+  (`swe-bench-tasks`, `swe-bench-multilingual-tasks`, `swe-bench-multimodal-tasks`),
   under `src/sb_dockerfile_gen/`. These used to live in `harness/constants.py`, which no longer holds them.
 
 ### Part A: Versioning
@@ -63,7 +63,7 @@ Determining a version for each task instance can be accomplished in a number of 
 * Scrape from web: Repositories with websites (i.e. [xarray.dev](https://xarray.dev/)) have a "Releases" or "What's New" page (i.e. [release page](https://docs.xarray.dev/en/stable/whats-new.html) for xarray). This can be scraped for information.
 * Build from code: Sometimes, version-related files (i.e. `_version.py`) are purposely omitted by a developer (check `.gitignore` to verify). In this case, per task instance you can build the repository source code locally and extract the version number from the built codebase.
 
-Versioning tooling now lives with the task data, at [swe-bench-dockerfiles/src/versioning](https://github.com/SWE-bench/swe-bench-dockerfiles/tree/main/src/versioning).
+Versioning tooling now lives with the task data, at [swe-bench-tasks/src/versioning](https://github.com/SWE-bench/swe-bench-tasks/tree/main/src/versioning).
 
 ### Part B: Installation Configurations
 Per repository, you must provide installation instructions per version. In `constants.py`...

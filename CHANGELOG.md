@@ -7,7 +7,7 @@ Prior to version 1.1.0, not all deployed versions are listed, as the PyPI packag
 ## [Unreleased] - 5.0.0rc
 
 Breaking changes:
-* `swebench.versioning` moved out of this repo, to [swe-bench-dockerfiles/src/versioning](https://github.com/SWE-bench/swe-bench-dockerfiles/tree/main/src/versioning). It builds datasets rather than running them, and only works for the original Python repos. The `swebench dataset versions` command and seven `swebench.*` version helpers are gone with it.
+* `swebench.versioning` moved out of this repo, to [swe-bench-tasks/src/versioning](https://github.com/SWE-bench/swe-bench-tasks/tree/main/src/versioning). It builds datasets rather than running them, and only works for the original Python repos. The `swebench dataset versions` command and seven `swebench.*` version helpers are gone with it.
 * Names in the `swebench` namespace are now loaded on first use. Everything importable before still is, but `import swebench` no longer pulls in bs4, docker, datasets and modal.
 * Datasets carry their own `eval_script` and metadata, so the harness no longer needs a Dockerfile repo checkout to evaluate.
 * Image building moved to `swebench.image_builder`, with an `ImageSpec` that supports amd64 and arm64. `TestSpec` now assumes images already exist.

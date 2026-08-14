@@ -71,8 +71,8 @@ swebench dataset build multimodal -s test
 swebench dataset build verified --task-repos ~/code
 ```
 
-It expects the `swe-bench-dockerfiles`, `swe-bench-multilingual-dockerfiles` and
-`swe-bench-multimodal-dockerfiles` checkouts, found via `--task-repos` or
+It expects the `swe-bench-tasks`, `swe-bench-multilingual-tasks` and
+`swe-bench-multimodal-tasks` checkouts, found via `--task-repos` or
 `SWEBENCH_TASK_REPOS`.
 
 ### `swebench dataset collect REPOS...`
@@ -85,7 +85,7 @@ swebench dataset collect psf/requests --max-pulls 200 --cutoff-date 20230101
 ```
 
 Versioning candidate instances is no longer part of this CLI. That tooling lives with
-the task data, at [swe-bench-dockerfiles/src/versioning](https://github.com/SWE-bench/swe-bench-dockerfiles/tree/main/src/versioning).
+the task data, at [swe-bench-tasks/src/versioning](https://github.com/SWE-bench/swe-bench-tasks/tree/main/src/versioning).
 
 ## Older invocations
 

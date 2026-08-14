@@ -27,9 +27,9 @@ _REPO_ROOT = Path(
     or Path.home() / "code"
 )
 DOCKERFILE_REPOS = {
-    "og": _REPO_ROOT / "swe-bench-dockerfiles",
-    "multilingual": _REPO_ROOT / "swe-bench-multilingual-dockerfiles",
-    "multimodal": _REPO_ROOT / "swe-bench-multimodal-dockerfiles",
+    "og": _REPO_ROOT / "swe-bench-tasks",
+    "multilingual": _REPO_ROOT / "swe-bench-multilingual-tasks",
+    "multimodal": _REPO_ROOT / "swe-bench-multimodal-tasks",
 }
 
 # Inline script that loads a generator and produces eval scripts for a batch
