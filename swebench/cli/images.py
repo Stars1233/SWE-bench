@@ -4,8 +4,6 @@ from typing import Optional
 
 import typer
 
-from swebench.cli._datasets import alias_help, resolve_dataset
-
 images_app = typer.Typer(
     name="images",
     help="Build, check and clean instance images.",
@@ -13,46 +11,41 @@ images_app = typer.Typer(
     context_settings={"help_option_names": ["-h", "--help"]},
 )
 
-DATASET_ARG = typer.Argument(
-    ..., metavar="DATASET", help=f"Dataset alias, HuggingFace id, or local path. Aliases: {alias_help()}"
-)
-
 
 @images_app.command("build")
 def build(
-    dataset: str = DATASET_ARG,
-    split: str = typer.Option("test", "-s", "--split"),
+    task_repo: str = typer.Argument(
+        ..., metavar="TASK_REPO", help="Path to a task repo"
+    ),
     instance_ids: Optional[list[str]] = typer.Option(
         None, "-i", "--instance", help="Only these instances (repeatable)"
     ),
     workers: int = typer.Option(4, "-j", "--workers"),
     force_rebuild: bool = typer.Option(False, "--force-rebuild"),
-    namespace: Optional[str] = typer.Option(None, "-n", "--namespace", help="Registry namespace to tag for"),
-    tag: str = typer.Option("latest", "--tag"),
-    task_repo: Optional[str] = typer.Option(
-        None, "--task-repo", "--dockerfile-repo", help="Path or GitHub ref"
+    namespace: Optional[str] = typer.Option(
+        None, "-n", "--namespace", help="Registry namespace to tag for"
     ),
+    tag: str = typer.Option("latest", "--tag"),
     dry_run: bool = typer.Option(False, "--dry-run", help="List what would be built"),
     open_file_limit: int = typer.Option(4096, "--open-file-limit"),
 ):
-    """Build images ahead of an evaluation.
+    """Build images ahead of an evaluation, from a task repo.
 
-    Images are per instance but always selected through a dataset, since the
-    Dockerfile comes from the instance row. Use -i to narrow to a subset.
+    Builds everything the repo publishes. Use -i to narrow to a subset, which can
+    name a task in an unpublished split.
 
     [yellow][bold]Examples:[/bold][/yellow]
 
-        swebench images build verified -j 8
+        swebench images build ~/swe-bench-tasks -j 8
 
-        swebench images build multimodal -i carbon-design-system__carbon-10188
+        swebench images build ~/swe-bench-multimodal-tasks -i carbon-design-system__carbon-10188
 
-        swebench images build lite --dry-run
+        swebench images build ~/swe-bench-tasks --dry-run
     """
     from swebench.image_builder.prepare_images import main as prepare_images
 
     prepare_images(
-        dataset_name=resolve_dataset(dataset),
-        split=split,
+        task_repo=task_repo,
         instance_ids=list(instance_ids) if instance_ids else None,
         max_workers=workers,
         force_rebuild=force_rebuild,
@@ -60,35 +53,38 @@ def build(
         namespace=namespace,
         tag=tag,
         dry_run=dry_run,
-        task_repo=task_repo,
     )
 
 
 @images_app.command("check")
 def check(
-    dataset: str = DATASET_ARG,
-    split: str = typer.Option("test", "-s", "--split"),
+    task_repo: str = typer.Argument(
+        ..., metavar="TASK_REPO", help="Path to a task repo"
+    ),
+    instance_ids: Optional[list[str]] = typer.Option(
+        None, "-i", "--instance", help="Only these instances (repeatable)"
+    ),
     workers: int = typer.Option(16, "-j", "--workers"),
 ):
-    """Report which of a dataset's images are missing from the registry.
+    """Report which of a task repo's images are missing from the registry.
 
     Catches a stale or partially-pushed image set before an evaluation spends
     hours discovering it one instance at a time.
 
     [yellow][bold]Examples:[/bold][/yellow]
 
-        swebench images check verified
+        swebench images check ~/swe-bench-tasks
 
-        swebench images check multilingual -j 32
+        swebench images check ~/swe-bench-multilingual-tasks -j 32
     """
     from concurrent.futures import ThreadPoolExecutor
 
     import docker
 
-    from swebench.harness.utils import load_swebench_dataset
+    from swebench.task_repo import select_tasks
 
     client = docker.from_env()
-    instances = load_swebench_dataset(resolve_dataset(dataset), split)
+    instances = select_tasks(task_repo, list(instance_ids) if instance_ids else None)
     names = sorted({i["image"] for i in instances if i.get("image")})
     if not names:
         typer.echo("dataset rows carry no image field")
@@ -113,7 +109,9 @@ def check(
 
 @images_app.command("clean")
 def clean(
-    run_id: Optional[str] = typer.Option(None, "--run-id", help="Remove containers from this run"),
+    run_id: Optional[str] = typer.Option(
+        None, "--run-id", help="Remove containers from this run"
+    ),
     instance_ids: Optional[list[str]] = typer.Option(None, "-i", "--instance"),
     predictions: Optional[str] = typer.Option(None, "-p", "--predictions"),
 ):
@@ -135,3 +133,38 @@ def clean(
         predictions_path=predictions,
         run_id=run_id,
     )
+
+
+@images_app.command("push")
+def push(
+    task_repo: str = typer.Argument(
+        ..., metavar="TASK_REPO", help="Path to a task repo"
+    ),
+    instance_ids: Optional[list[str]] = typer.Option(
+        None, "-i", "--instance", help="Only these instances (repeatable)"
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be pushed"),
+):
+    """Push each task's image to the registry, under the name its task.json declares.
+
+    The dataset tells the harness which image to pull, so the pushed name has to
+    match. Images that are not built locally are reported, not silently skipped.
+
+    [yellow][bold]Examples:[/bold][/yellow]
+
+        swebench images push ~/swe-bench-multilingual-tasks --dry-run
+
+        swebench images push ~/swe-bench-multilingual-tasks -i google__gson-2479
+    """
+    from swebench.task_publish import CheckFailed, push_images, summarize
+
+    try:
+        plan = push_images(
+            task_repo,
+            instance_ids=list(instance_ids) if instance_ids else None,
+            dry_run=dry_run,
+        )
+    except CheckFailed as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1) from e
+    typer.echo(summarize(plan))

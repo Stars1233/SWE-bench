@@ -24,17 +24,11 @@ def eval_command(
         None, "-i", "--instance", help="Limit to these instances (repeatable)"
     ),
     split: str = typer.Option("test", "-s", "--split"),
-    workers: int = typer.Option(4, "-j", "--workers", help="Instances evaluated in parallel"),
+    workers: int = typer.Option(
+        4, "-j", "--workers", help="Instances evaluated in parallel"
+    ),
     timeout: int = typer.Option(1800, "-t", "--timeout", help="Per-instance seconds"),
     report_dir: str = typer.Option(".", "--report-dir"),
-    assets_dir: Optional[str] = typer.Option(
-        None,
-        "--assets-dir",
-        help=(
-            "Local mirror of the dataset's binary patch assets "
-            "(<assets_dir>/<instance_id>/<path>); falls back to image_assets urls"
-        ),
-    ),
     task_repo: Optional[str] = typer.Option(
         None,
         "--task-repo",
@@ -46,7 +40,9 @@ def eval_command(
             "when one exists."
         ),
     ),
-    modal: bool = typer.Option(False, "--modal", help="Run on Modal instead of local Docker"),
+    modal: bool = typer.Option(
+        False, "--modal", help="Run on Modal instead of local Docker"
+    ),
     open_file_limit: int = typer.Option(4096, "--open-file-limit"),
 ):
     """Evaluate gold or model predictions against a dataset.
@@ -55,7 +51,7 @@ def eval_command(
 
         swebench eval verified --gold
 
-        swebench eval lite -p preds.jsonl --run-id gpt5 -j 16
+        swebench eval verified -p preds.jsonl --run-id gpt5 -j 16
 
         swebench eval multimodal --gold -i carbon-design-system__carbon-10188
 
@@ -80,14 +76,15 @@ def eval_command(
         rewrite_reports=False,
         modal=modal,
         report_dir=report_dir,
-        assets_dir=assets_dir,
         task_repo=task_repo,
     )
 
 
 def report_command(
     run_id: str = typer.Argument(..., help="Run id to re-grade"),
-    dataset: str = typer.Option("verified", "-d", "--dataset", help="Dataset the run used"),
+    dataset: str = typer.Option(
+        "verified", "-d", "--dataset", help="Dataset the run used"
+    ),
     split: str = typer.Option("test", "-s", "--split"),
     instance_ids: Optional[list[str]] = typer.Option(None, "-i", "--instance"),
     report_dir: str = typer.Option(".", "--report-dir"),

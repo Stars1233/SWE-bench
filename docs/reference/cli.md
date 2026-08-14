@@ -8,10 +8,9 @@ Installing the package provides a `swebench` command. Every command takes
 | alias | dataset |
 |---|---|
 | `full` | `SWE-bench/SWE-bench` |
-| `lite` | `SWE-bench/SWE-bench_Lite` |
 | `verified` | `SWE-bench/SWE-bench_Verified` |
-| `multimodal`, `mm` | `SWE-bench/SWE-bench_Multimodal` |
-| `multilingual`, `ml` | `SWE-bench/SWE-bench_Multilingual` |
+| `multimodal` | `SWE-bench/SWE-bench_Multimodal` |
+| `multilingual` | `SWE-bench/SWE-bench_Multilingual` |
 
 ## Evaluate
 
@@ -21,7 +20,7 @@ Run the reference patches or a model's predictions.
 
 ```bash
 swebench eval verified --gold
-swebench eval lite -p preds.jsonl --run-id gpt5 -j 16
+swebench eval verified -p preds.jsonl --run-id gpt5 -j 16
 swebench eval multimodal --gold -i carbon-design-system__carbon-10188
 swebench eval full --gold --modal
 ```
@@ -42,38 +41,86 @@ swebench report my-run -d multimodal -i grommet__grommet-6282
 
 ## Images
 
-Images are per instance but selected through a dataset, because the Dockerfile
-comes from the instance row. Narrow with `-i`.
+Images are built from a task repo: each task carries its own Dockerfile, and its
+`task.json` names the image the dataset will tell the harness to pull. Narrow
+with `-i`, which can name a task in an unpublished split.
 
 ```bash
-swebench images build verified -j 8
-swebench images build multimodal -i carbon-design-system__carbon-10188
-swebench images build lite --dry-run
+swebench images build ~/swe-bench-tasks -j 8
+swebench images build ~/swe-bench-multimodal-tasks -i carbon-design-system__carbon-10188
+swebench images build ~/swe-bench-tasks --dry-run
 
-swebench images check multilingual        # which images are missing from the registry
-swebench images clean --run-id my-run     # remove leftover containers
+swebench images check ~/swe-bench-tasks    # which images are missing from the registry
+swebench images push  ~/swe-bench-tasks    # publish them, under the names task.json declares
+swebench images clean --run-id my-run      # remove leftover containers
 ```
 
 `images check` is worth running before a long evaluation: it catches a stale or
 partially-pushed image set in seconds rather than one instance at a time.
+`images push --dry-run` prints the exact `docker push` commands and stops.
 
 ## Datasets
 
-### `swebench dataset build DATASET`
+A task repo holds one directory per instance:
 
-Regenerate a dataset's parquet. This joins the public columns from HuggingFace
-with the `eval_script`, `log_parser`, `eval_type` and `image` fields produced by
-the task data repositories' generators. Run it after changing a generator, then
-push the result to HuggingFace.
-
-```bash
-swebench dataset build multimodal -s test
-swebench dataset build verified --task-repos ~/code
+```
+config.json                  the dataset this repo publishes, and its splits
+tasks/<instance_id>/
+    task.json                metadata, including which split the task is in
+    problem_statement.md     the issue text shown to a model
+    gold.patch               the reference fix
+    test.patch               the tests that grade it
+    eval.sh                  the script the harness runs
+    Dockerfile               the image it runs in
+    assets/                  binary files a patch cannot carry
 ```
 
-It expects the `swe-bench-tasks`, `swe-bench-multilingual-tasks` and
-`swe-bench-multimodal-tasks` checkouts, found via `--task-repos` or
-`SWEBENCH_TASK_REPOS`.
+The tree is the source of truth. Nothing below reads HuggingFace to build the
+dataset, so a new dataset can be developed entirely locally.
+
+### `swebench dataset check TASK_REPO`
+
+Check that a task repo is well formed: every task has its files, its metadata,
+and a split registered in `config.json`. This runs automatically before building
+or publishing, so a malformed tree is never published.
+
+```bash
+swebench dataset check ~/swe-bench-tasks
+swebench dataset check ~/swe-bench-tasks --fix   # write back what the tree implies
+```
+
+`--fix` only writes what can be derived from the tree itself: the split list in
+`config.json`, and image names that follow the naming convention. It never
+invents data it cannot see.
+
+### `swebench dataset build TASK_REPO`
+
+Compile the repo into one parquet per split.
+
+```bash
+swebench dataset build ~/swe-bench-multilingual-tasks
+swebench dataset build ~/swe-bench-tasks -o /tmp/parquets
+```
+
+### `swebench dataset diff TASK_REPO`
+
+Show how the tree differs from the dataset it publishes, per column.
+
+```bash
+swebench dataset diff ~/swe-bench-multilingual-tasks
+```
+
+### `swebench dataset push TASK_REPO`
+
+Overwrite the HuggingFace dataset named in `config.json`.
+
+```bash
+swebench dataset push ~/swe-bench-tasks --dry-run
+swebench dataset push ~/swe-bench-tasks
+```
+
+A task whose split is not published, `deprecated` for example, stays in the tree
+and can still be built by id, but never reaches the dataset.
 
 ### `swebench dataset collect REPOS...`
 

@@ -1,14 +1,12 @@
 """Dataset name resolution shared by the CLI commands."""
 
+# One spelling per dataset. Anything else, including a full HuggingFace id or a
+# local path, passes through untouched.
 DATASET_ALIASES = {
     "full": "SWE-bench/SWE-bench",
-    "swe-bench": "SWE-bench/SWE-bench",
-    "lite": "SWE-bench/SWE-bench_Lite",
     "verified": "SWE-bench/SWE-bench_Verified",
-    "multimodal": "SWE-bench/SWE-bench_Multimodal",
-    "mm": "SWE-bench/SWE-bench_Multimodal",
     "multilingual": "SWE-bench/SWE-bench_Multilingual",
-    "ml": "SWE-bench/SWE-bench_Multilingual",
+    "multimodal": "SWE-bench/SWE-bench_Multimodal",
 }
 
 

@@ -15,7 +15,7 @@ app = typer.Typer(
 [yellow][not dim][bold]Examples:[/bold][/not dim][/yellow]
 
     swebench eval verified --gold
-    swebench eval lite -p preds.jsonl --run-id gpt5 -j 16
+    swebench eval verified -p preds.jsonl --run-id gpt5 -j 16
     swebench eval multimodal --gold -i carbon-design-system__carbon-10188
     swebench report my-run -d verified
     swebench images build verified -j 8

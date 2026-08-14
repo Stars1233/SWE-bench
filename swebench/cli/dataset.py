@@ -4,7 +4,11 @@ from typing import Optional
 
 import typer
 
-from swebench.cli._datasets import alias_help, resolve_dataset
+
+def _fail(error: Exception) -> int:
+    typer.echo(str(error), err=True)
+    return 1
+
 
 dataset_app = typer.Typer(
     name="dataset",
@@ -16,83 +20,125 @@ dataset_app = typer.Typer(
 
 @dataset_app.command("build")
 def build(
-    dataset: str = typer.Argument(
-        ..., metavar="DATASET", help=f"Dataset alias or HuggingFace id. Aliases: {alias_help()}"
+    task_repo: str = typer.Argument(
+        ..., metavar="TASK_REPO", help="Path to a task repo"
     ),
-    split: Optional[list[str]] = typer.Option(None, "-s", "--split", help="Splits to build (repeatable)"),
-    out: Optional[str] = typer.Option(None, "-o", "--out", help="Output directory (default: ./data)"),
-    task_repos: Optional[str] = typer.Option(
-        None,
-        "--task-repos",
-        "--dockerfile-repos",
-        help="Directory holding the swe-bench task data repo checkouts",
-    ),
+    out: str = typer.Option("data", "-o", "--out", help="Where to write the parquets"),
 ):
-    """Regenerate a dataset's parquet, including the fields the harness reads.
+    """Compile a task repo into one parquet per split.
 
-    Joins the public columns from HuggingFace with the eval scripts, parsers and
-    image names produced by the dockerfile repos' generators, writing
-    eval_script, log_parser, eval_type and image alongside them. Run this after
-    changing a generator, then push the result to HuggingFace.
+    Reads only the repo, so what you get is what the tree says. The repo is
+    checked first; a malformed tree is not compiled.
 
     [yellow][bold]Examples:[/bold][/yellow]
 
-        swebench dataset build multimodal -s test
+        swebench dataset build ~/swe-bench-multilingual-tasks
 
-        swebench dataset build verified --task-repos ~/code
-
-        swebench dataset build lite -s dev -s test -o /tmp/out
+        swebench dataset build ~/swe-bench-tasks -o /tmp/parquets
     """
-    import os
-    from pathlib import Path
+    from swebench.task_publish import CheckFailed, write_parquets
 
-    if task_repos:
-        os.environ["SWEBENCH_TASK_REPOS"] = task_repos
-    if out:
-        os.environ["SWEBENCH_DATA_DIR"] = out
+    try:
+        written = write_parquets(task_repo, out)
+    except CheckFailed as e:
+        raise typer.Exit(_fail(e)) from e
+    for split, path in written.items():
+        typer.echo(f"{split}: {path}")
 
-    from swebench.collect import build_local_datasets as b
 
-    full = resolve_dataset(dataset)
-    short = full.split("/")[-1]
-    configs = {
-        "SWE-bench": (b.MAP_REPO_TO_PARSER_NAME_OG, b.FAIL_ONLY_REPOS_OG, "og", {"environment_setup_commit"}),
-        "SWE-bench_Lite": (b.MAP_REPO_TO_PARSER_NAME_OG, b.FAIL_ONLY_REPOS_OG, "og", {"environment_setup_commit"}),
-        "SWE-bench_Verified": (
-            b.MAP_REPO_TO_PARSER_NAME_OG, b.FAIL_ONLY_REPOS_OG, "og",
-            {"environment_setup_commit", "difficulty"},
-        ),
-        "SWE-bench_Multilingual": (
-            b.MAP_REPO_TO_PARSER_NAME_MULTILINGUAL, b.FAIL_ONLY_REPOS_MULTILINGUAL, "multilingual", None,
-        ),
-        "SWE-bench_Multimodal": (
-            b.MAP_REPO_TO_PARSER_NAME_MULTIMODAL, b.FAIL_ONLY_REPOS_MULTIMODAL, "multimodal", {"image_assets"},
-        ),
-    }
-    if short not in configs:
-        raise typer.BadParameter(f"no generator config for {full}; expected one of {list(configs)}")
+@dataset_app.command("check")
+def check(
+    task_repo: str = typer.Argument(
+        ..., metavar="TASK_REPO", help="Path to a task repo"
+    ),
+    fix: bool = typer.Option(False, "--fix", help="Write back what the tree implies"),
+):
+    """Check that a task repo is well formed.
 
-    parser_map, fail_only, key, extra = configs[short]
-    base = Path(os.environ.get("SWEBENCH_DATA_DIR", Path.cwd() / "data"))
-    b.process_dataset(
-        hf_name=full,
-        parser_map=parser_map,
-        fail_only_repos=fail_only,
-        generator_key=key,
-        output_dir=base / short,
-        label=short,
-        extra_required_fields=extra,
-        splits=list(split) if split else None,
-    )
+    Every task needs its files, its metadata and a registered split. With --fix,
+    the parts that can be derived from the tree are written back: the split list
+    in config.json, and image names that follow the naming convention.
+
+    [yellow][bold]Examples:[/bold][/yellow]
+
+        swebench dataset check ~/swe-bench-multilingual-tasks
+
+        swebench dataset check ~/swe-bench-tasks --fix
+    """
+    from swebench.task_checks import check_task_repo, errors
+
+    problems = check_task_repo(task_repo, fix=fix)
+    for problem in problems:
+        typer.echo(str(problem))
+    blocking = errors(problems)
+    if blocking:
+        typer.echo(
+            f"\n{len(blocking)} error(s), {len(problems) - len(blocking)} warning(s)"
+        )
+        raise typer.Exit(1)
+    typer.echo(f"{task_repo} looks well formed")
+
+
+@dataset_app.command("diff")
+def diff(
+    task_repo: str = typer.Argument(
+        ..., metavar="TASK_REPO", help="Path to a task repo"
+    ),
+):
+    """Show how a task repo differs from the dataset it publishes.
+
+    [yellow][bold]Examples:[/bold][/yellow]
+
+        swebench dataset diff ~/swe-bench-multilingual-tasks
+    """
+    from swebench.task_publish import CheckFailed, diff_against_hub, summarize
+
+    try:
+        typer.echo(summarize(diff_against_hub(task_repo)))
+    except CheckFailed as e:
+        raise typer.Exit(_fail(e)) from e
+
+
+@dataset_app.command("push")
+def push(
+    task_repo: str = typer.Argument(
+        ..., metavar="TASK_REPO", help="Path to a task repo"
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be pushed"),
+):
+    """Overwrite the HuggingFace dataset named in the repo's config.json.
+
+    [yellow][bold]Examples:[/bold][/yellow]
+
+        swebench dataset push ~/swe-bench-multilingual-tasks --dry-run
+
+        swebench dataset push ~/swe-bench-multilingual-tasks
+    """
+    from swebench.task_publish import CheckFailed, push_dataset, summarize
+
+    try:
+        typer.echo(summarize(push_dataset(task_repo, dry_run=dry_run)))
+    except CheckFailed as e:
+        raise typer.Exit(_fail(e)) from e
 
 
 @dataset_app.command("collect")
 def collect(
-    repos: list[str] = typer.Argument(..., help="GitHub repos, e.g. scikit-learn/scikit-learn"),
-    path_prs: str = typer.Option("prs", "--path-prs", help="Where to write the scraped PRs"),
-    path_tasks: str = typer.Option("tasks", "--path-tasks", help="Where to write candidate instances"),
-    max_pulls: Optional[int] = typer.Option(None, "--max-pulls", help="Stop after this many PRs"),
-    cutoff_date: Optional[str] = typer.Option(None, "--cutoff-date", help="Ignore PRs before YYYYMMDD"),
+    repos: list[str] = typer.Argument(
+        ..., help="GitHub repos, e.g. scikit-learn/scikit-learn"
+    ),
+    path_prs: str = typer.Option(
+        "prs", "--path-prs", help="Where to write the scraped PRs"
+    ),
+    path_tasks: str = typer.Option(
+        "tasks", "--path-tasks", help="Where to write candidate instances"
+    ),
+    max_pulls: Optional[int] = typer.Option(
+        None, "--max-pulls", help="Stop after this many PRs"
+    ),
+    cutoff_date: Optional[str] = typer.Option(
+        None, "--cutoff-date", help="Ignore PRs before YYYYMMDD"
+    ),
 ):
     """Scrape pull requests from GitHub into candidate task instances.
 

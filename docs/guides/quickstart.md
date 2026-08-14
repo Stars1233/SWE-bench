@@ -37,7 +37,7 @@ swebench_multilingual = load_dataset('princeton-nlp/SWE-bench_Multilingual', spl
 To evaluate an LLM's performance on SWE-bench:
 
 ```bash
-swebench eval lite -p <path_to_predictions> --run-id <run_id> -j 8
+swebench eval verified -p <path_to_predictions> --run-id <run_id> -j 8
 
 # reference patches
 swebench eval lite --gold -i sympy__sympy-20590 --run-id validate-gold

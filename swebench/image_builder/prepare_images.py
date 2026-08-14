@@ -11,29 +11,9 @@ from pathlib import Path
 from swebench.image_builder.image_spec import get_image_specs_from_dataset
 from swebench.image_builder.docker_build import build_instance_images
 from swebench.image_builder.docker_utils import list_images
-from swebench.harness.utils import load_swebench_dataset, str2bool, optional_str
-
-DOCKERFILES_SUBDIR = Path("src") / "dockerfiles"
-
-
-def load_dockerfiles_from_dir(dockerfiles_dir: Path) -> dict[str, str]:
-    """
-    Load Dockerfiles from a flat directory.
-
-    Expects structure: dockerfiles_dir/<instance_id>.Dockerfile
-
-    Args:
-        dockerfiles_dir: Path to directory containing <instance_id>.Dockerfile files.
-    Returns:
-        Dict mapping instance_id to Dockerfile content.
-    """
-    dockerfiles = {}
-    if not dockerfiles_dir.exists():
-        raise FileNotFoundError(f"Dockerfiles directory not found: {dockerfiles_dir}")
-    for dockerfile_path in dockerfiles_dir.glob("*.Dockerfile"):
-        instance_id = dockerfile_path.name.removesuffix(".Dockerfile")
-        dockerfiles[instance_id] = dockerfile_path.read_text()
-    return dockerfiles
+from swebench.harness.utils import optional_str, str2bool
+from swebench.task_publish import guard
+from swebench.task_repo import load_dockerfiles, select_tasks
 
 
 def _is_github_ref(task_repo: str) -> bool:
@@ -49,7 +29,9 @@ def _github_ref_to_urls(task_repo: str) -> list[str]:
     """Convert a GitHub reference to clone URLs (SSH first, then HTTPS fallback)."""
     if re.match(r"^https?://github\.com/", task_repo):
         # Extract owner/repo from URL
-        match = re.match(r"^https?://github\.com/([\w.-]+/[\w.-]+?)(?:\.git)?/?$", task_repo)
+        match = re.match(
+            r"^https?://github\.com/([\w.-]+/[\w.-]+?)(?:\.git)?/?$", task_repo
+        )
         if not match:
             return [task_repo.rstrip("/") + ".git"]
         owner_repo = match.group(1)
@@ -121,8 +103,7 @@ def filter_image_specs(
 
 
 def main(
-    dataset_name,
-    split,
+    task_repo,
     instance_ids,
     max_workers,
     force_rebuild,
@@ -130,34 +111,28 @@ def main(
     namespace,
     tag,
     dry_run,
-    task_repo,
 ):
     """
-    Build Docker images for the specified instances.
+    Build Docker images for the tasks in a task repo.
 
     Args:
-        dataset_name (str): Name of the HuggingFace dataset.
-        split (str): Dataset split to use.
-        instance_ids (list): List of instance IDs to build.
+        task_repo (str): Task repo reference — a local path, GitHub "owner/repo", or GitHub URL.
+        instance_ids (list): Only these instances; without them, everything the repo publishes.
         max_workers (int): Number of workers for parallel processing.
         force_rebuild (bool): Whether to force rebuild all images.
         open_file_limit (int): Open file limit.
         namespace (str): Docker registry namespace.
         tag (str): Docker image tag.
         dry_run (bool): If True, create docker files and build contexts but don't build images.
-        task_repo (str): Dockerfile repo reference — a local path, GitHub "owner/repo", or GitHub URL.
     """
     # Set open file limit
     resource.setrlimit(resource.RLIMIT_NOFILE, (open_file_limit, open_file_limit))
     client = docker.from_env(timeout=600)
 
-    # Load pre-generated dockerfiles
     with resolve_task_repo(task_repo) as repo_path:
-        dockerfiles_dir = repo_path / DOCKERFILES_SUBDIR
-        dockerfiles = load_dockerfiles_from_dir(dockerfiles_dir)
-
-    # Load dataset and create image specs
-    dataset = load_swebench_dataset(dataset_name, split, instance_ids=instance_ids)
+        guard(repo_path)
+        dataset = select_tasks(repo_path, instance_ids)
+        dockerfiles = load_dockerfiles(repo_path, [i["instance_id"] for i in dataset])
     image_specs = get_image_specs_from_dataset(dataset, dockerfiles, namespace, tag)
     image_specs = filter_image_specs(image_specs, client, force_rebuild)
 
@@ -190,13 +165,6 @@ def main(
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument(
-        "--dataset_name",
-        type=str,
-        default="SWE-bench/SWE-bench_Verified",
-        help="Name of the dataset to use",
-    )
-    parser.add_argument("--split", type=str, default="test", help="Split to use")
     parser.add_argument(
         "--instance_ids",
         nargs="+",
@@ -231,7 +199,7 @@ if __name__ == "__main__":
         "--task_repo",
         type=str,
         required=True,
-        help="Dockerfile repo: local path, GitHub 'owner/repo', or 'https://github.com/owner/repo'",
+        help="Task repo: local path, GitHub 'owner/repo', or 'https://github.com/owner/repo'",
     )
     args = parser.parse_args()
     main(**vars(args))

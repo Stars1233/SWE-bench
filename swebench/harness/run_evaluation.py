@@ -38,6 +38,7 @@ from swebench.harness.modal_eval import (
 )
 from swebench.types import TestSpec
 from swebench.harness.utils import make_test_spec
+from swebench.task_repo import asset_path, load_task_repo
 from swebench.harness.utils import (
     EvaluationError,
     load_swebench_dataset,
@@ -124,6 +125,7 @@ def create_container(
             if "409" in str(e) or "Conflict" in str(e):
                 # Ghost container — use a unique suffix
                 import time
+
                 container_name = f"{container_name}.{int(time.time())}"
                 logger.info(f"Retrying with unique name: {container_name}")
                 container = client.containers.create(
@@ -132,9 +134,9 @@ def create_container(
                     user=CONTAINER_USER,
                     detach=True,
                     command="tail -f /dev/null",
-                # Docker's default seccomp profile only permits CLONE_NEWUSER with
-                # CAP_SYS_ADMIN, which browser sandboxes need (e.g. openlayers karma)
-                cap_add=["SYS_ADMIN"],
+                    # Docker's default seccomp profile only permits CLONE_NEWUSER with
+                    # CAP_SYS_ADMIN, which browser sandboxes need (e.g. openlayers karma)
+                    cap_add=["SYS_ADMIN"],
                 )
             else:
                 raise
@@ -147,17 +149,15 @@ def create_container(
         raise EvaluationError(test_spec.instance_id, str(e), logger) from e
 
 
-def _resolve_asset_bytes(asset: dict, assets_dir: Path | None, logger) -> bytes | None:
-    """Read an asset from a local mirror if present, else fetch its url.
-
-    The mirror is laid out as <assets_dir>/<instance_id>/<asset path>, which is how
-    the dataset's own dockerfile repo stores them. Nothing here is dataset-specific:
-    it only uses the `path`/`url` fields every image_assets entry carries.
-    """
-    if assets_dir is not None:
-        local = Path(assets_dir) / asset["instance_id"] / asset["path"]
+def _resolve_asset_bytes(asset: dict, task_repo: str | None, logger) -> bytes | None:
+    """Read an asset from the task repo if there is one, else fetch its url."""
+    if task_repo is not None:
+        local = asset_path(task_repo, asset["instance_id"], asset["path"])
         if local.is_file():
             return local.read_bytes()
+    if not asset.get("url"):
+        logger.warning(f"No asset for {asset['instance_id']} at {asset['path']}")
+        return None
     try:
         with urllib.request.urlopen(asset["url"], timeout=60) as resp:
             return resp.read()
@@ -167,7 +167,7 @@ def _resolve_asset_bytes(asset: dict, assets_dir: Path | None, logger) -> bytes 
 
 
 def _stage_image_assets(
-    container, test_spec, log_dir: Path, logger, assets_dir: Path | None = None
+    container, test_spec, log_dir: Path, logger, task_repo: str | None = None
 ) -> list[str]:
     """Stage a patch's binary assets in the container; return restore commands.
 
@@ -181,7 +181,7 @@ def _stage_image_assets(
     assets = []
     for key in ("test_patch", "patch"):
         for entry in declared.get(key) or []:
-            if entry.get("path") and entry.get("url"):
+            if entry.get("path"):
                 assets.append({**entry, "instance_id": test_spec.instance_id})
     if not assets:
         return []
@@ -190,10 +190,13 @@ def _stage_image_assets(
     container.exec_run("mkdir -p /image_assets", user="root")
     restore, from_mirror = [], 0
     for asset in assets:
-        data = _resolve_asset_bytes(asset, assets_dir, logger)
+        data = _resolve_asset_bytes(asset, task_repo, logger)
         if data is None:
             continue
-        if assets_dir is not None and (Path(assets_dir) / asset["instance_id"] / asset["path"]).is_file():
+        if (
+            task_repo is not None
+            and asset_path(task_repo, asset["instance_id"], asset["path"]).is_file()
+        ):
             from_mirror += 1
         flat = asset["path"].replace("/", "__")
         local = staging / flat
@@ -229,7 +232,7 @@ def run_instance(
     timeout: int | None = None,
     rewrite_reports: bool = False,
     skip_patch: bool = False,
-    assets_dir: str | None = None,
+    task_repo: str | None = None,
 ):
     """
     Run a single instance with the given prediction.
@@ -287,7 +290,9 @@ def run_instance(
             logger.info(
                 f"Intermediate patch for {instance_id} written to {patch_file}, now applying to container..."
             )
-            copy_to_container(container, patch_file, PurePosixPath(CONTAINER_PATCH_FILE))
+            copy_to_container(
+                container, patch_file, PurePosixPath(CONTAINER_PATCH_FILE)
+            )
 
             # Attempt to apply patch to container
             applied_patch = False
@@ -346,7 +351,7 @@ def run_instance(
         # them as urls in image_assets; without this the tests run against a
         # missing baseline and error out.
         restore_cmds = _stage_image_assets(
-            container, test_spec, log_dir, logger, assets_dir
+            container, test_spec, log_dir, logger, task_repo
         )
 
         eval_file = Path(log_dir / "eval.sh")
@@ -430,7 +435,7 @@ def run_instances(
     timeout: int,
     rewrite_reports: bool = False,
     skip_patch: bool = False,
-    assets_dir: str | None = None,
+    task_repo: str | None = None,
 ):
     """
     Run all instances for the given predictions in parallel.
@@ -459,7 +464,7 @@ def run_instances(
                 timeout,
                 rewrite_reports,
                 skip_patch,
-                assets_dir,
+                task_repo,
             )
         )
 
@@ -467,6 +472,15 @@ def run_instances(
     print(f"Running {len(instances)} instances...")
     run_threadpool(run_instance, payloads, max_workers)
     print("All instances run.")
+
+
+def load_instances(
+    dataset_name: str, split: str, instance_ids: list | None, task_repo: str | None
+) -> list:
+    """Instances come from the task repo when one is given, else from the dataset."""
+    if task_repo:
+        return load_task_repo(task_repo, instance_ids)
+    return load_swebench_dataset(dataset_name, split, instance_ids)
 
 
 def get_dataset_from_preds(
@@ -477,6 +491,7 @@ def get_dataset_from_preds(
     run_id: str,
     rewrite_reports: bool,
     exclude_completed: bool = True,
+    task_repo: str | None = None,
 ):
     """
     Return only instances that have predictions and are in the dataset.
@@ -484,7 +499,7 @@ def get_dataset_from_preds(
     If exclude_completed is True, only return instances that have not been run yet.
     """
     # load dataset
-    dataset = load_swebench_dataset(dataset_name, split)
+    dataset = load_instances(dataset_name, split, None, task_repo)
     dataset_ids = {i["instance_id"] for i in dataset}
 
     if instance_ids:
@@ -578,11 +593,8 @@ def _build_before_eval(dataset, dataset_name, split, task_repo, max_workers, cli
     """
     from swebench.image_builder.docker_build import build_instance_images
     from swebench.image_builder.image_spec import get_image_specs_from_dataset
-    from swebench.image_builder.prepare_images import (
-        DOCKERFILES_SUBDIR,
-        load_dockerfiles_from_dir,
-        resolve_task_repo,
-    )
+    from swebench.image_builder.prepare_images import resolve_task_repo
+    from swebench.task_repo import load_dockerfiles
 
     wanted = {d["instance_id"]: make_test_spec(d).image for d in dataset}
     # namespace and tag come from the image the dataset names, so built tags match
@@ -592,13 +604,16 @@ def _build_before_eval(dataset, dataset_name, split, task_repo, max_workers, cli
 
     print(f"Building {len(wanted)} image(s) from {task_repo} before evaluating...")
     with resolve_task_repo(task_repo) as repo_path:
-        dockerfiles = load_dockerfiles_from_dir(repo_path / DOCKERFILES_SUBDIR)
+        dockerfiles = load_dockerfiles(repo_path, list(wanted))
     image_specs = get_image_specs_from_dataset(dataset, dockerfiles, namespace, tag)
     if not image_specs:
         print("No Dockerfiles matched these instances; nothing was built.")
     else:
         build_instance_images(
-            client=client, image_specs=image_specs, force_rebuild=True, max_workers=max_workers
+            client=client,
+            image_specs=image_specs,
+            force_rebuild=True,
+            max_workers=max_workers,
         )
 
     # trust the registry only where a build did not produce the image
@@ -611,7 +626,9 @@ def _build_before_eval(dataset, dataset_name, split, task_repo, max_workers, cli
     if not missing:
         print(f"Built {len(wanted)} image(s) locally; none pulled.")
         return
-    print(f"BUILD FAILED for {len(missing)} instance(s): {', '.join(i for i, _ in sorted(missing))}")
+    print(
+        f"BUILD FAILED for {len(missing)} instance(s): {', '.join(i for i, _ in sorted(missing))}"
+    )
     for iid, image in missing:
         try:
             client.images.pull(image)
@@ -632,7 +649,6 @@ def main(
     rewrite_reports: bool,
     modal: bool,
     report_dir: str = ".",
-    assets_dir: str | None = None,
     task_repo: str | None = None,
 ):
     """
@@ -657,9 +673,15 @@ def main(
 
     # get dataset from predictions
     dataset = get_dataset_from_preds(
-        dataset_name, split, instance_ids, predictions, run_id, rewrite_reports
+        dataset_name,
+        split,
+        instance_ids,
+        predictions,
+        run_id,
+        rewrite_reports,
+        task_repo=task_repo,
     )
-    full_dataset = load_swebench_dataset(dataset_name, split, instance_ids)
+    full_dataset = load_instances(dataset_name, split, instance_ids, task_repo)
 
     if modal:
         # run instances on Modal
@@ -691,7 +713,7 @@ def main(
             run_id,
             timeout,
             rewrite_reports=rewrite_reports,
-            assets_dir=assets_dir,
+            task_repo=task_repo,
         )
 
     # make final report
@@ -713,9 +735,7 @@ if __name__ == "__main__":
         help="Name of dataset or path to JSON file.",
     )
     parser.add_argument(
-        "-s",
-        "--split",
-        type=str, default="test", help="Split of the dataset"
+        "-s", "--split", type=str, default="test", help="Split of the dataset"
     )
     parser.add_argument(
         "-i",
@@ -750,11 +770,7 @@ if __name__ == "__main__":
         help="Timeout (in seconds) for running tests for each instance",
     )
     parser.add_argument(
-        "-id",
-        "--run_id",
-        type=str,
-        required=True,
-        help="Run ID - identifies the run"
+        "-id", "--run_id", type=str, required=True, help="Run ID - identifies the run"
     )
     parser.add_argument(
         "--rewrite_reports",
@@ -764,16 +780,6 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--report_dir", type=str, default=".", help="Directory to write reports to"
-    )
-    parser.add_argument(
-        "--assets_dir",
-        type=str,
-        default=None,
-        help=(
-            "Local mirror of a dataset's binary patch assets, laid out as "
-            "<assets_dir>/<instance_id>/<path>. Falls back to the urls in "
-            "image_assets for anything missing."
-        ),
     )
 
     # Modal execution args
