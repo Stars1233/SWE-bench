@@ -31,6 +31,19 @@ PR_KEYWORDS = {
 }
 
 
+def build_issues_pattern(clone_url: str | None = None) -> re.Pattern:
+    """Match "<keyword> #123", and full issue URLs for this repo when known.
+
+    e.g. both "fixes #123" and "fixes https://github.com/owner/repo/issues/123".
+    The URL is escaped so its dots cannot act as regex wildcards.
+    """
+    markers = [r"\#"]
+    if clone_url:
+        repo_url = clone_url[: -len(".git")] if clone_url.endswith(".git") else clone_url
+        markers.append(re.escape(f"{repo_url}/issues/"))
+    return re.compile(rf"(\w+)\s+(?:{'|'.join(markers)})(\d+)")
+
+
 class Repo:
     def __init__(self, owner: str, name: str, token: Optional[str] = None):
         """
@@ -65,7 +78,7 @@ class Repo:
                 while True:
                     rl = self.api.rate_limit.get()
                     logger.info(
-                        f"[{self.owner}/{self.name}] Rate limit exceeded for token {self.token[:10]}, "
+                        f"[{self.owner}/{self.name}] Rate limit exceeded for token {(self.token or '')[:10]}, "
                         f"waiting for 5 minutes, remaining calls: {rl.resources.core.remaining}"
                     )
                     if rl.resources.core.remaining > 0:
@@ -84,8 +97,9 @@ class Repo:
         Return:
             resolved_issues (list): list of issue numbers referenced by PR
         """
-        # Define 1. issue number regex pattern 2. comment regex pattern 3. keywords
-        issues_pat = re.compile(r"(\w+)\s+\#(\d+)")
+
+        clone_url = ((pull.get("base") or {}).get("repo") or {}).get("clone_url")
+        issues_pat = build_issues_pattern(clone_url)
         comments_pat = re.compile(r"(?s)<!--.*?-->")
 
         # Construct text to search over for issue numbers from PR body and commit messages
@@ -153,7 +167,7 @@ class Repo:
                 # Rate limit handling
                 logger.error(
                     f"[{self.owner}/{self.name}] Error processing page {page} "
-                    f"w/ token {self.token[:10]} - {e}"
+                    f"w/ token {(self.token or '')[:10]} - {e}"
                 )
                 while True:
                     rl = self.api.rate_limit.get()
@@ -161,7 +175,7 @@ class Repo:
                         break
                     logger.info(
                         f"[{self.owner}/{self.name}] Waiting for rate limit reset "
-                        f"for token {self.token[:10]}, checking again in 5 minutes"
+                        f"for token {(self.token or '')[:10]}, checking again in 5 minutes"
                     )
                     time.sleep(60 * 5)
         if not quiet:
