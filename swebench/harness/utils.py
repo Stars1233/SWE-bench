@@ -8,6 +8,11 @@ from dotenv import load_dotenv
 from pathlib import Path
 from tqdm import tqdm
 from typing import cast
+from swebench.harness.constants import (
+    END_TEST_OUTPUT,
+    TEST_EXIT_CODE,
+    TEST_EXIT_CODE_VAR,
+)
 from swebench.types import SWEbenchInstance, TestSpec
 
 
@@ -195,6 +200,28 @@ def parse_eval_script(eval_script: str) -> list[str]:
     ]
 
 
+def record_test_exit_code(eval_script_list: list[str]) -> list[str]:
+    """Make the eval script record the test command's own exit status.
+
+    Eval scripts end with a `git checkout` that resets the test files, and run
+    under `set -uxo pipefail` without `-e`, so the script's exit status is the
+    reset's, not the tests'. Capturing `$?` immediately after the test command
+    and echoing it after the end marker keeps the value out of the parsed region.
+    """
+    for i, line in enumerate(eval_script_list):
+        if END_TEST_OUTPUT in line:
+            return [
+                *eval_script_list[:i],
+                f"{TEST_EXIT_CODE_VAR}=$?",
+                line,
+                f'echo "{TEST_EXIT_CODE}: ${TEST_EXIT_CODE_VAR}"',
+                *eval_script_list[i + 1 :],
+            ]
+    # No end marker (unrecognized script shape): leave it untouched, and grading
+    # falls back to the pre-existing behavior of trusting the log alone.
+    return eval_script_list
+
+
 def _parse_image_assets(raw) -> dict:
     """image_assets ships as a JSON string in the HF datasets, dict when local."""
     if not raw:
@@ -214,7 +241,9 @@ def make_test_spec(instance: dict) -> TestSpec:
     return TestSpec(
         instance_id=instance["instance_id"],
         image=instance["image"],
-        eval_script_list=parse_eval_script(instance["eval_script"]),
+        eval_script_list=record_test_exit_code(
+            parse_eval_script(instance["eval_script"])
+        ),
         repo=instance["repo"],
         version=instance["version"],
         FAIL_TO_PASS=json.loads(f2p) if isinstance(f2p, str) else f2p,

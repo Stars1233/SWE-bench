@@ -12,6 +12,7 @@ from swebench.harness.constants import (
     START_TEST_OUTPUT,
     TESTS_ERROR,
     TESTS_TIMEOUT,
+    TEST_EXIT_CODE,
     EvalType,
     ResolvedStatus,
     TestStatus,
@@ -38,7 +39,18 @@ SUITE_RAN = re.compile(
 )
 
 
+# The eval script records the test command's own exit status under this marker,
+# written after the end-of-output marker so it stays outside the parsed region
+TEST_EXIT_CODE_RE = re.compile(rf"{re.escape(TEST_EXIT_CODE)}:\s*(-?\d+)")
+
+
 # MARK: Utility functions
+def parse_test_exit_code(content: str) -> int | None:
+    """Return the recorded test command exit status, or None if absent."""
+    match = TEST_EXIT_CODE_RE.search(content)
+    return int(match.group(1)) if match else None
+
+
 def _resolve_case(case: str, sm: dict[str, str]) -> str | None:
     """Return the status-map key for ``case``, tolerating truncated parametrized ids.
 
@@ -138,6 +150,21 @@ def get_logs_eval(test_spec: TestSpec, log_fp: str) -> tuple[dict[str, str], boo
             # a pass. Under EvalType.FAIL_ONLY an absent test counts as success, so
             # without this a suite that never started (e.g. a browser that fails to
             # launch) scores every F2P test as resolved.
+            return {}, False
+
+        # A patch can print its own "PASSED" lines (e.g. from a conftest.py hook),
+        # so cross-check the log against the test command's exit status, recorded
+        # by the eval script. Exiting non-zero while reporting no failure at all
+        # means the log is not describing the run that actually happened.
+        exit_code = parse_test_exit_code(content)
+        if (
+            exit_code not in (None, 0)
+            and status_map
+            and not any(
+                status in (TestStatus.FAILED.value, TestStatus.ERROR.value)
+                for status in status_map.values()
+            )
+        ):
             return {}, False
         return status_map, True
 

@@ -48,6 +48,9 @@ TESTS_PASSED = ">>>>> All Tests Passed"
 TESTS_TIMEOUT = ">>>>> Tests Timed Out"
 START_TEST_OUTPUT = ">>>>> Start Test Output"
 END_TEST_OUTPUT = ">>>>> End Test Output"
+TEST_EXIT_CODE = ">>>>> Test Exit Code"
+# shell variable the eval script stashes the test command's $? in
+TEST_EXIT_CODE_VAR = "SWEBENCH_TEST_EXIT_CODE"
 
 # Constants - Evaluation Miscellaneous
 NON_TEST_EXTS = [
