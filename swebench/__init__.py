@@ -1,57 +1,92 @@
 __version__ = "5.0.0rc"
 
-from swebench.collect.build_dataset import main as build_dataset
-from swebench.collect.get_tasks_pipeline import main as get_tasks_pipeline
-from swebench.collect.print_pulls import main as print_pulls
+# Imported on first use, not at import time: eagerly importing these pulled in bs4,
+# docker, datasets and modal, so `import swebench` cost seconds and failed outright
+# when an optional dependency was missing (#525).
+_LAZY_IMPORTS = {
+    "build_dataset": ("swebench.collect.build_dataset", "main"),
+    "get_tasks_pipeline": ("swebench.collect.get_tasks_pipeline", "main"),
+    "print_pulls": ("swebench.collect.print_pulls", "main"),
+    "SWEbenchInstance": ("swebench.types", "SWEbenchInstance"),
+    "build_instance_images": ("swebench.image_builder", "build_instance_images"),
+    "build_instance_image": ("swebench.image_builder", "build_instance_image"),
+    "cleanup_container": ("swebench.harness.docker_utils", "cleanup_container"),
+    "copy_to_container": ("swebench.harness.docker_utils", "copy_to_container"),
+    "exec_run_with_timeout": ("swebench.harness.docker_utils", "exec_run_with_timeout"),
+    "compute_fail_to_pass": ("swebench.harness.grading", "compute_fail_to_pass"),
+    "compute_pass_to_pass": ("swebench.harness.grading", "compute_pass_to_pass"),
+    "get_eval_report": ("swebench.harness.grading", "get_eval_report"),
+    "get_resolution_status": ("swebench.harness.grading", "get_resolution_status"),
+    "ResolvedStatus": ("swebench.harness.grading", "ResolvedStatus"),
+    "TestStatus": ("swebench.harness.grading", "TestStatus"),
+    "PARSER_REGISTRY": ("swebench.harness.log_parsers", "PARSER_REGISTRY"),
+    "run_evaluation": ("swebench.harness.run_evaluation", "main"),
+    "run_threadpool": ("swebench.harness.utils", "run_threadpool"),
+    "MAP_REPO_TO_VERSION_PATHS": (
+        "swebench.versioning.constants",
+        "MAP_REPO_TO_VERSION_PATHS",
+    ),
+    "MAP_REPO_TO_VERSION_PATTERNS": (
+        "swebench.versioning.constants",
+        "MAP_REPO_TO_VERSION_PATTERNS",
+    ),
+    "get_version": ("swebench.versioning.get_versions", "get_version"),
+    "get_versions_from_build": (
+        "swebench.versioning.get_versions",
+        "get_versions_from_build",
+    ),
+    "get_versions_from_web": (
+        "swebench.versioning.get_versions",
+        "get_versions_from_web",
+    ),
+    "map_version_to_task_instances": (
+        "swebench.versioning.get_versions",
+        "map_version_to_task_instances",
+    ),
+    "split_instances": ("swebench.versioning.utils", "split_instances"),
+}
 
-from swebench.types import (
-    SWEbenchInstance,
-)
+__all__ = [
+    "MAP_REPO_TO_VERSION_PATHS",
+    "MAP_REPO_TO_VERSION_PATTERNS",
+    "PARSER_REGISTRY",
+    "ResolvedStatus",
+    "SWEbenchInstance",
+    "TestStatus",
+    "__version__",
+    "build_dataset",
+    "build_instance_image",
+    "build_instance_images",
+    "cleanup_container",
+    "compute_fail_to_pass",
+    "compute_pass_to_pass",
+    "copy_to_container",
+    "exec_run_with_timeout",
+    "get_eval_report",
+    "get_resolution_status",
+    "get_tasks_pipeline",
+    "get_version",
+    "get_versions_from_build",
+    "get_versions_from_web",
+    "map_version_to_task_instances",
+    "print_pulls",
+    "run_evaluation",
+    "run_threadpool",
+    "split_instances",
+]
 
-from swebench.image_builder import (
-    build_instance_images,
-    build_instance_image,
-)
 
-from swebench.harness.docker_utils import (
-    cleanup_container,
-    copy_to_container,
-    exec_run_with_timeout,
-)
+def __getattr__(name: str):
+    try:
+        module_path, attr = _LAZY_IMPORTS[name]
+    except KeyError:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from None
+    import importlib
 
-from swebench.harness.grading import (
-    compute_fail_to_pass,
-    compute_pass_to_pass,
-    get_eval_report,
-    get_resolution_status,
-    ResolvedStatus,
-    TestStatus,
-)
+    value = getattr(importlib.import_module(module_path), attr)
+    globals()[name] = value  # cache so later lookups skip this path
+    return value
 
-from swebench.harness.log_parsers import (
-    PARSER_REGISTRY,
-)
 
-from swebench.harness.run_evaluation import (
-    main as run_evaluation,
-)
-
-from swebench.harness.utils import (
-    run_threadpool,
-)
-
-from swebench.versioning.constants import (
-    MAP_REPO_TO_VERSION_PATHS,
-    MAP_REPO_TO_VERSION_PATTERNS,
-)
-
-from swebench.versioning.get_versions import (
-    get_version,
-    get_versions_from_build,
-    get_versions_from_web,
-    map_version_to_task_instances,
-)
-
-from swebench.versioning.utils import (
-    split_instances,
-)
+def __dir__():
+    return sorted(__all__)
