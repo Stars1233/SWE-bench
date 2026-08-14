@@ -17,6 +17,7 @@ from swebench.harness.constants import (
     ResolvedStatus,
     TestStatus,
 )
+from swebench.harness.infra_failure import TIER_ENVIRONMENT, classify_logs
 from swebench.types import TestSpec
 from swebench.harness.log_parsers import PARSER_REGISTRY
 
@@ -344,6 +345,7 @@ def get_eval_report(
         "patch_exists": False,
         "patch_successfully_applied": False,
         "resolved": False,
+        "infra_failure": False,
     }
 
     # Check if the model patch exists
@@ -356,6 +358,13 @@ def get_eval_report(
     eval_status_map, found = get_logs_eval(test_spec, test_log_path)
 
     if not found:
+        # No parseable test output: flag a likely environment fault for triage.
+        # Advisory only -- `resolved` stays False either way (#586).
+        classification = classify_logs(test_log_path)
+        if classification:
+            reason, tier = classification
+            report_map[instance_id]["infra_failure"] = tier == TIER_ENVIRONMENT
+            report_map[instance_id]["infra_failure_reason"] = reason
         return report_map
     report_map[instance_id]["patch_successfully_applied"] = True
 
