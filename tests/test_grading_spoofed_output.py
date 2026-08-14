@@ -11,10 +11,14 @@ runs whose reset fails, which is the case for every test patch that creates a ne
 test file.
 """
 
+import inspect
+import re
 import subprocess
+import sys
 
 from swebench.harness.constants import END_TEST_OUTPUT, START_TEST_OUTPUT
 from swebench.harness.grading import get_logs_eval, parse_test_exit_code
+from swebench.harness.log_parsers import PARSER_REGISTRY
 from swebench.harness.utils import record_test_exit_code
 from swebench.types import TestSpec
 
@@ -107,6 +111,38 @@ def test_exit_code_is_recorded_after_the_test_command(tmp_path):
     assert script.index(END_LINE) == capture + 1
     assert script[capture + 2].startswith('echo ">>>>> Test Exit Code:')
     assert script[-1] == RESET_CMD
+
+
+def _parser_source(fn, seen=None):
+    """Source of a parser plus any parse_log_* helper it delegates to."""
+    seen = seen if seen is not None else set()
+    if fn.__name__ in seen:
+        return ""
+    seen.add(fn.__name__)
+    source = inspect.getsource(fn)
+    module = sys.modules[fn.__module__]
+    for name in re.findall(r"\b(parse_log_\w+)\s*\(", source):
+        helper = getattr(module, name, None)
+        if callable(helper) and helper.__name__ != fn.__name__:
+            source += _parser_source(helper, seen)
+    return source
+
+
+def test_every_parser_can_record_a_failure():
+    """The check reads "recorded no failure" as evidence the log is not truthful.
+
+    That only holds for parsers that could have recorded one. A parser that only
+    ever records passes would make the condition true for its genuine failures
+    too, and they would be thrown out instead of graded. None exist today; this
+    fails if one is added, since the check would then need to exempt it.
+    """
+    assignable = re.compile(r"TestStatus\.(FAILED|ERROR)\b")
+    blind = [
+        name
+        for name, parser in PARSER_REGISTRY.items()
+        if not assignable.search(_parser_source(parser))
+    ]
+    assert blind == []
 
 
 def test_scripts_without_an_end_marker_are_left_alone():
