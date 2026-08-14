@@ -32,9 +32,8 @@ def usage_to_dict(
     if output_tokens is not None:
         result["output_tokens"] = output_tokens
 
-    token_details = (
-        _usage_value(usage, "prompt_tokens_details")
-        or _usage_value(usage, "input_tokens_details")
+    token_details = _usage_value(usage, "prompt_tokens_details") or _usage_value(
+        usage, "input_tokens_details"
     )
     cached_input_tokens = _usage_value(token_details, "cached_tokens")
     cache_creation_input_tokens = _usage_value(usage, "cache_creation_input_tokens")

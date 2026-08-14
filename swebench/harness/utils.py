@@ -148,7 +148,10 @@ def load_swebench_dataset(
             name = "SWE-bench/SWE-bench_Lite"
         parquet_path = Path(name) / f"{split}.parquet"
         if parquet_path.exists():
-            dataset = cast(Dataset, load_dataset("parquet", data_files=str(parquet_path), split="train"))
+            dataset = cast(
+                Dataset,
+                load_dataset("parquet", data_files=str(parquet_path), split="train"),
+            )
         elif (Path(name) / split / "dataset_info.json").exists():
             dataset = cast(Dataset, load_from_disk(Path(name) / split))
         else:

@@ -3,7 +3,6 @@ from swebench.harness.constants import TestStatus
 from swebench.types import TestSpec
 
 
-
 def parse_log_phpunit(log: str, test_spec: TestSpec) -> dict[str, str]:
     """
     Parser for phpunit logs with the --testdox option.

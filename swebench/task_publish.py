@@ -94,7 +94,7 @@ def diff_against_hub(repo_path: str | Path) -> dict[str, dict]:
 
 
 def push_dataset(repo_path: str | Path, dry_run: bool = False) -> dict:
-    """Overwrite the dataset named in config.json with the tree."""
+    """Overwrite the dataset named in sweb.yaml with the tree."""
     config = load_config(repo_path)
     splits = compile_splits(repo_path)
     plan = {
@@ -123,7 +123,7 @@ def push_images(
     instance_ids: list[str] | None = None,
     dry_run: bool = False,
 ) -> dict:
-    """Push each task's image under exactly the name its task.json declares.
+    """Push each task's image under exactly the name its task.yaml declares.
 
     The dataset tells the harness which image to pull, so publishing any other
     name produces a dataset that cannot be run.

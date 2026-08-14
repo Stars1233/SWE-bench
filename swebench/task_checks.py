@@ -10,14 +10,18 @@ tree itself, and never guesses at data it cannot see.
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from pathlib import Path
+
+import yaml
 
 from swebench.task_repo import (
     AS_FILE,
     CONFIG_FILE,
+    TASK_FILE,
+    dump_yaml,
     load_config,
+    load_yaml,
     task_dirs,
     tasks_root,
 )
@@ -25,7 +29,7 @@ from swebench.task_repo import (
 # kept in the tree but deliberately not published, e.g. instances that were dropped
 DEPRECATED_SPLIT = "deprecated"
 
-REQUIRED_FILES = ("task.json", "Dockerfile", *AS_FILE.values())
+REQUIRED_FILES = (TASK_FILE, "Dockerfile", *AS_FILE.values())
 REQUIRED_KEYS = (
     "instance_id",
     "repo",
@@ -71,20 +75,20 @@ def _check_task(task_dir: Path, known_splits: set[str]) -> list[Problem]:
     missing = [f for f in REQUIRED_FILES if not (task_dir / f).is_file()]
     if missing:
         problems.append(Problem(where, f"missing {', '.join(sorted(missing))}"))
-    if not (task_dir / "task.json").is_file():
+    if not (task_dir / TASK_FILE).is_file():
         return problems  # nothing further can be checked
 
     try:
-        meta = json.loads((task_dir / "task.json").read_text())
-    except json.JSONDecodeError as e:
-        return [*problems, Problem(where, f"task.json is not valid JSON: {e}")]
+        meta = load_yaml(task_dir / TASK_FILE)
+    except yaml.YAMLError as e:
+        return [*problems, Problem(where, f"{TASK_FILE} is not valid YAML: {e}")]
 
     for key in REQUIRED_KEYS:
         if key not in meta:
-            problems.append(Problem(where, f"task.json has no {key}"))
+            problems.append(Problem(where, f"{TASK_FILE} has no {key}"))
     if meta.get("instance_id") not in (None, task_dir.name):
         problems.append(
-            Problem(where, f"task.json instance_id is {meta['instance_id']!r}")
+            Problem(where, f"{TASK_FILE} instance_id is {meta['instance_id']!r}")
         )
     for key in ("FAIL_TO_PASS", "PASS_TO_PASS"):
         if key in meta and not isinstance(meta[key], list):
@@ -146,26 +150,26 @@ def check_task_repo(repo_path: str | Path, fix: bool = False) -> list[Problem]:
     # splits are derivable from the tree, so an unregistered one can be filled in
     if fix:
         used = {
-            json.loads((d / "task.json").read_text()).get("split")
+            load_yaml(d / TASK_FILE).get("split")
             for d in dirs
-            if (d / "task.json").is_file()
+            if (d / TASK_FILE).is_file()
         }
         publishable = sorted(s for s in used if s and s != DEPRECATED_SPLIT)
         if publishable and publishable != sorted(known_splits):
             config["splits"] = publishable
-            (repo_path / CONFIG_FILE).write_text(json.dumps(config, indent=2) + "\n")
+            (repo_path / CONFIG_FILE).write_text(dump_yaml(config))
             problems = [
                 p for p in problems if not (p.fixable and CONFIG_FILE in p.message)
             ]
         for task_dir in dirs:
-            meta_path = task_dir / "task.json"
+            meta_path = task_dir / TASK_FILE
             if not meta_path.is_file():
                 continue
-            meta = json.loads(meta_path.read_text())
+            meta = load_yaml(meta_path)
             derived = expected_image(task_dir.name)
             if meta.get("image") != derived:
                 meta["image"] = derived
-                meta_path.write_text(json.dumps(meta, indent=2, sort_keys=True) + "\n")
+                meta_path.write_text(dump_yaml(meta))
                 problems = [
                     p
                     for p in problems
@@ -176,13 +180,14 @@ def check_task_repo(repo_path: str | Path, fix: bool = False) -> list[Problem]:
                     )
                 ]
 
-    # a directory with no task.json is invisible to the loaders, so say so
+    # a directory with no task.yaml is invisible to the loaders, so say so
     strays = [
         d.name
         for d in tasks_root(repo_path).iterdir()
-        if d.is_dir() and not (d / "task.json").is_file()
+        if d.is_dir() and not (d / TASK_FILE).is_file()
     ]
     problems.extend(
-        Problem(f"tasks/{name}", "no task.json, so it is not a task") for name in strays
+        Problem(f"tasks/{name}", f"no {TASK_FILE}, so it is not a task")
+        for name in strays
     )
     return problems

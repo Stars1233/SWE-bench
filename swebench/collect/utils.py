@@ -39,7 +39,9 @@ def build_issues_pattern(clone_url: str | None = None) -> re.Pattern:
     """
     markers = [r"\#"]
     if clone_url:
-        repo_url = clone_url[: -len(".git")] if clone_url.endswith(".git") else clone_url
+        repo_url = (
+            clone_url[: -len(".git")] if clone_url.endswith(".git") else clone_url
+        )
         markers.append(re.escape(f"{repo_url}/issues/"))
     return re.compile(rf"(\w+)\s+(?:{'|'.join(markers)})(\d+)")
 

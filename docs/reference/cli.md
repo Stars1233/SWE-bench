@@ -42,7 +42,7 @@ swebench report my-run -d multimodal -i grommet__grommet-6282
 ## Images
 
 Images are built from a task repo: each task carries its own Dockerfile, and its
-`task.json` names the image the dataset will tell the harness to pull. Narrow
+`task.yaml` names the image the dataset will tell the harness to pull. Narrow
 with `-i`, which can name a task in an unpublished split.
 
 ```bash
@@ -51,7 +51,7 @@ swebench images build ~/swe-bench-multimodal-tasks -i carbon-design-system__carb
 swebench images build ~/swe-bench-tasks --dry-run
 
 swebench images check ~/swe-bench-tasks    # which images are missing from the registry
-swebench images push  ~/swe-bench-tasks    # publish them, under the names task.json declares
+swebench images push  ~/swe-bench-tasks    # publish them, under the names task.yaml declares
 swebench images clean --run-id my-run      # remove leftover containers
 ```
 
@@ -64,9 +64,9 @@ partially-pushed image set in seconds rather than one instance at a time.
 A task repo holds one directory per instance:
 
 ```
-config.json                  the dataset this repo publishes, and its splits
+sweb.yaml                    the dataset this repo publishes, and its splits
 tasks/<instance_id>/
-    task.json                metadata, including which split the task is in
+    task.yaml                metadata, including which split the task is in
     problem_statement.md     the issue text shown to a model
     gold.patch               the reference fix
     test.patch               the tests that grade it
@@ -81,7 +81,7 @@ dataset, so a new dataset can be developed entirely locally.
 ### `swebench dataset check TASK_REPO`
 
 Check that a task repo is well formed: every task has its files, its metadata,
-and a split registered in `config.json`. This runs automatically before building
+and a split registered in `sweb.yaml`. This runs automatically before building
 or publishing, so a malformed tree is never published.
 
 ```bash
@@ -90,7 +90,7 @@ swebench dataset check ~/swe-bench-tasks --fix   # write back what the tree impl
 ```
 
 `--fix` only writes what can be derived from the tree itself: the split list in
-`config.json`, and image names that follow the naming convention. It never
+`sweb.yaml`, and image names that follow the naming convention. It never
 invents data it cannot see.
 
 ### `swebench dataset build TASK_REPO`
@@ -112,7 +112,7 @@ swebench dataset diff ~/swe-bench-multilingual-tasks
 
 ### `swebench dataset push TASK_REPO`
 
-Overwrite the HuggingFace dataset named in `config.json`.
+Overwrite the HuggingFace dataset named in `sweb.yaml`.
 
 ```bash
 swebench dataset push ~/swe-bench-tasks --dry-run

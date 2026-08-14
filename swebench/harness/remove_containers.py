@@ -51,9 +51,14 @@ def main(instance_ids=None, predictions_path=None, run_id=None):
 if __name__ == "__main__":
     parser = ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--instance_ids", nargs="+", type=str, help="Instance IDs to remove containers for"
+        "--instance_ids",
+        nargs="+",
+        type=str,
+        help="Instance IDs to remove containers for",
     )
     parser.add_argument("--predictions_path", type=str, help="Path to predictions file")
-    parser.add_argument("--run_id", type=str, help="Only remove containers from this run")
+    parser.add_argument(
+        "--run_id", type=str, help="Only remove containers from this run"
+    )
     args = parser.parse_args()
     main(**vars(args))

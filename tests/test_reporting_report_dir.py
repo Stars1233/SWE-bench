@@ -22,9 +22,7 @@ def _fixture():
 
 def test_report_written_into_report_dir(tmp_path):
     predictions, full_dataset = _fixture()
-    out = make_run_report(
-        predictions, full_dataset, "run-a", report_dir=str(tmp_path)
-    )
+    out = make_run_report(predictions, full_dataset, "run-a", report_dir=str(tmp_path))
     assert out.parent == tmp_path
     assert out.name == "gold.run-a.json"
     assert out.exists()
@@ -33,9 +31,7 @@ def test_report_written_into_report_dir(tmp_path):
 def test_report_dir_is_created_if_absent(tmp_path):
     predictions, full_dataset = _fixture()
     nested = tmp_path / "deep" / "nested"
-    out = make_run_report(
-        predictions, full_dataset, "run-b", report_dir=str(nested)
-    )
+    out = make_run_report(predictions, full_dataset, "run-b", report_dir=str(nested))
     assert out.parent == nested and out.exists()
 
 

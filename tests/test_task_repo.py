@@ -4,9 +4,8 @@ The tree has to round trip exactly: a patch that loses its CRLF no longer applie
 and an instance id that silently disappears shrinks a run without anyone noticing.
 """
 
-import json
-
 import pytest
+import yaml
 
 from swebench.task_repo import (
     asset_path,
@@ -22,8 +21,8 @@ CRLF_PATCH = "diff --git a/x b/x\r\n--- a/x\r\n+++ b/x\r\n+one\r\n"
 
 
 def _config(repo, dataset="x/y-dataset", splits=("test",)):
-    (repo / "config.json").write_text(
-        json.dumps({"dataset": dataset, "splits": list(splits)})
+    (repo / "sweb.yaml").write_text(
+        yaml.safe_dump({"dataset": dataset, "splits": list(splits)})
     )
 
 
@@ -37,7 +36,7 @@ def _task(repo, instance_id, **overrides):
         "split": "test",
         **overrides,
     }
-    (d / "task.json").write_text(json.dumps(meta))
+    (d / "task.yaml").write_text(yaml.safe_dump(meta))
     (d / "gold.patch").write_text("gold")
     (d / "problem_statement.md").write_text(f"the issue for {instance_id}")
     (d / "eval.sh").write_text("#!/bin/bash\necho hi\n")
@@ -112,7 +111,7 @@ def test_config_names_the_destination(tmp_path):
 
 
 def test_config_without_a_dataset_is_an_error(tmp_path):
-    (tmp_path / "config.json").write_text(json.dumps({"splits": ["test"]}))
+    (tmp_path / "sweb.yaml").write_text(yaml.safe_dump({"splits": ["test"]}))
     with pytest.raises(ValueError, match="does not name a dataset"):
         load_config(tmp_path)
 

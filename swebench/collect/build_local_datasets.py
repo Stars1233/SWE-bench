@@ -246,9 +246,9 @@ def process_dataset(
     extra_required_fields: set[str] | None = None,
     splits: list[str] | None = None,
 ):
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Processing: {hf_name} -> {output_dir}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     ds_dict = load_dataset(hf_name)
     all_required = BASE_REQUIRED_FIELDS | METADATA_FIELDS
@@ -275,7 +275,9 @@ def process_dataset(
                     f"repo '{repo}' not found in parser map"
                 )
             ex["log_parser"] = parser_map[repo]
-            ex["eval_type"] = "fail_only" if repo in fail_only_repos else "pass_and_fail"
+            ex["eval_type"] = (
+                "fail_only" if repo in fail_only_repos else "pass_and_fail"
+            )
             ex["eval_script"] = eval_scripts[ex["instance_id"]]
             ex["image"] = get_image_name(ex["instance_id"])
             return ex
@@ -298,7 +300,11 @@ def process_dataset(
 
 
 def main():
-    base_output = Path(os.environ.get("SWEBENCH_DATA_DIR", Path(__file__).parent.parent.parent / "data"))
+    base_output = Path(
+        os.environ.get(
+            "SWEBENCH_DATA_DIR", Path(__file__).parent.parent.parent / "data"
+        )
+    )
 
     process_dataset(
         hf_name="SWE-bench/SWE-bench",
@@ -352,9 +358,9 @@ def main():
         splits=["dev", "test"],
     )
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("All datasets saved to:", base_output)
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
 
 if __name__ == "__main__":

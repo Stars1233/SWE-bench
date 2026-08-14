@@ -145,7 +145,7 @@ def push(
     ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be pushed"),
 ):
-    """Push each task's image to the registry, under the name its task.json declares.
+    """Push each task's image to the registry, under the name its task.yaml declares.
 
     The dataset tells the harness which image to pull, so the pushed name has to
     match. Images that are not built locally are reported, not silently skipped.

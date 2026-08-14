@@ -2,9 +2,9 @@
 
 A task repo holds one directory per instance::
 
-    config.json           the dataset this repo publishes, and its splits
+    sweb.yaml             the dataset this repo publishes, and its splits
     tasks/<instance_id>/
-        task.json             metadata, including which split the task is in
+        task.yaml             metadata, including which split the task is in
         problem_statement.md  the issue text shown to a model
         gold.patch            the reference fix
         test.patch            the tests that grade it
@@ -18,20 +18,48 @@ which is what makes local development of a new dataset possible.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
+
+import yaml
 
 TASKS_SUBDIR = "tasks"
 ASSETS_SUBDIR = "assets"
 
-# dataset columns kept as their own file rather than inside task.json
+# dataset columns kept as their own file rather than inside task.yaml
 AS_FILE = {
     "patch": "gold.patch",
     "test_patch": "test.patch",
     "eval_script": "eval.sh",
     "problem_statement": "problem_statement.md",
 }
-CONFIG_FILE = "config.json"
+CONFIG_FILE = "sweb.yaml"
+TASK_FILE = "task.yaml"
+
+
+class _Dumper(yaml.SafeDumper):
+    """Writes multi-line strings as literal blocks, so they stay readable."""
+
+
+def _represent_str(dumper: yaml.SafeDumper, data: str):
+    style = "|" if "\n" in data else None
+    return dumper.represent_scalar("tag:yaml.org,2002:str", data, style=style)
+
+
+_Dumper.add_representer(str, _represent_str)
+
+
+def dump_yaml(data: dict) -> str:
+    return yaml.dump(
+        data,
+        Dumper=_Dumper,
+        sort_keys=True,
+        allow_unicode=True,
+        default_flow_style=False,
+    )
+
+
+def load_yaml(path: Path) -> dict:
+    return yaml.safe_load(path.read_text())
 
 
 def _read(path: Path) -> str:
@@ -49,14 +77,14 @@ def tasks_root(repo_path: str | Path) -> Path:
 
 def task_dirs(repo_path: str | Path) -> list[Path]:
     return sorted(
-        d for d in tasks_root(repo_path).iterdir() if (d / "task.json").exists()
+        d for d in tasks_root(repo_path).iterdir() if (d / TASK_FILE).exists()
     )
 
 
 def load_task(task_dir: str | Path) -> dict:
     """One task directory, as the instance dict the harness expects."""
     task_dir = Path(task_dir)
-    instance = json.loads((task_dir / "task.json").read_text())
+    instance = load_yaml(task_dir / TASK_FILE)
     for column, filename in AS_FILE.items():
         instance[column] = _read(task_dir / filename)
     return instance
@@ -106,7 +134,7 @@ def load_config(repo_path: str | Path) -> dict:
     path = Path(repo_path) / CONFIG_FILE
     if not path.is_file():
         raise FileNotFoundError(f"{repo_path} has no {CONFIG_FILE}")
-    config = json.loads(path.read_text())
+    config = load_yaml(path)
     if not config.get("dataset"):
         raise ValueError(f"{path} does not name a dataset")
     config.setdefault("splits", ["test"])

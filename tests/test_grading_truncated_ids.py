@@ -78,7 +78,9 @@ def test_mixed_passed_and_xfail_matches_resolve():
     ``test_callable_analyzer_error[file-AttributeError-'str'``, which prefix-
     matches three parametrizations -- two PASSED and one XFAIL.
     """
-    truncated = "tests/test_text.py::test_callable_analyzer_error[file-AttributeError-'str'"
+    truncated = (
+        "tests/test_text.py::test_callable_analyzer_error[file-AttributeError-'str'"
+    )
     sm = {
         truncated + " object has no attribute 'read'-CountVectorizer]": PASSED,
         truncated + " object has no attribute 'read'-TfidfVectorizer]": PASSED,

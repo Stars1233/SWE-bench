@@ -57,7 +57,7 @@ def check(
 
     Every task needs its files, its metadata and a registered split. With --fix,
     the parts that can be derived from the tree are written back: the split list
-    in config.json, and image names that follow the naming convention.
+    in sweb.yaml, and image names that follow the naming convention.
 
     [yellow][bold]Examples:[/bold][/yellow]
 
@@ -106,7 +106,7 @@ def push(
     ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be pushed"),
 ):
-    """Overwrite the HuggingFace dataset named in the repo's config.json.
+    """Overwrite the HuggingFace dataset named in the repo's sweb.yaml.
 
     [yellow][bold]Examples:[/bold][/yellow]
 

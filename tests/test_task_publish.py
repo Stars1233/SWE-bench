@@ -5,17 +5,16 @@ becomes a broken instance on a leaderboard. Compiling and pushing therefore run
 the checks first rather than trusting the caller to have run them.
 """
 
-import json
-
 import pytest
+import yaml
 
 from swebench.task_checks import check_task_repo, errors, expected_image
 from swebench.task_publish import CheckFailed, compile_splits, guard
 
 
 def _repo(tmp_path, splits=("test",), **task_overrides):
-    (tmp_path / "config.json").write_text(
-        json.dumps({"dataset": "SWE-bench/Example", "splits": list(splits)})
+    (tmp_path / "sweb.yaml").write_text(
+        yaml.safe_dump({"dataset": "SWE-bench/Example", "splits": list(splits)})
     )
     return tmp_path
 
@@ -36,7 +35,7 @@ def _task(repo, instance_id, split="test", **overrides):
         "PASS_TO_PASS": [],
         **overrides,
     }
-    (d / "task.json").write_text(json.dumps(meta))
+    (d / "task.yaml").write_text(yaml.safe_dump(meta))
     (d / "problem_statement.md").write_text("an issue")
     (d / "gold.patch").write_text("diff --git a/x b/x\n")
     (d / "test.patch").write_text("diff --git a/t b/t\n")
@@ -91,10 +90,10 @@ def test_an_unregistered_split_is_reported_and_fixable(tmp_path):
     repo = _repo(tmp_path, splits=("test",))
     _task(repo, "a__a-1", split="dev")
     problems = check_task_repo(tmp_path)
-    assert any("not in config.json" in p.message for p in problems)
+    assert any("not in sweb.yaml" in p.message for p in problems)
 
     check_task_repo(tmp_path, fix=True)
-    assert json.loads((repo / "config.json").read_text())["splits"] == ["dev"]
+    assert yaml.safe_load((repo / "sweb.yaml").read_text())["splits"] == ["dev"]
     assert errors(check_task_repo(tmp_path)) == []
 
 
@@ -106,7 +105,7 @@ def test_a_wrong_image_name_is_reported_and_fixable(tmp_path):
     )
 
     check_task_repo(tmp_path, fix=True)
-    meta = json.loads((repo / "tasks" / "a__a-1" / "task.json").read_text())
+    meta = yaml.safe_load((repo / "tasks" / "a__a-1" / "task.yaml").read_text())
     assert meta["image"] == expected_image("a__a-1")
 
 

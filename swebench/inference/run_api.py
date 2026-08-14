@@ -353,8 +353,9 @@ def anthropic_inference(
     print(f"Using Anthropic key {'*' * max(0, len(api_key) - 5) + api_key[-5:]}")
     anthropic = Anthropic(api_key=api_key)
     test_dataset = test_dataset.filter(
-        lambda x: claude_tokenize(x["text"], anthropic)
-        <= MODEL_LIMITS[model_name_or_path],
+        lambda x: (
+            claude_tokenize(x["text"], anthropic) <= MODEL_LIMITS[model_name_or_path]
+        ),
         desc="Filtering",
         load_from_cache_file=False,
     )
