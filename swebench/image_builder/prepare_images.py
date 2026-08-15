@@ -46,7 +46,7 @@ def _github_ref_to_urls(task_repo: str) -> list[str]:
 @contextmanager
 def resolve_task_repo(task_repo: str):
     """
-    Resolve a dockerfile repo reference to a local path.
+    Resolve a task repo reference to a local path.
 
     Accepts:
         - A local directory path (used directly)
@@ -58,14 +58,14 @@ def resolve_task_repo(task_repo: str):
     if not _is_github_ref(task_repo):
         repo_path = Path(task_repo)
         if not repo_path.is_dir():
-            raise FileNotFoundError(f"Local dockerfile repo not found: {task_repo}")
+            raise FileNotFoundError(f"Local task repo not found: {task_repo}")
         yield repo_path
         return
 
     clone_urls = _github_ref_to_urls(task_repo)
     with tempfile.TemporaryDirectory() as tmpdir:
         for i, clone_url in enumerate(clone_urls):
-            print(f"Cloning dockerfile repo from {clone_url}...")
+            print(f"Cloning task repo from {clone_url}...")
             result = subprocess.run(
                 ["git", "clone", "--depth", "1", clone_url, tmpdir],
                 capture_output=True,
@@ -77,7 +77,7 @@ def resolve_task_repo(task_repo: str):
                 print(f"Clone failed, trying next URL...")
             else:
                 raise RuntimeError(
-                    f"Failed to clone dockerfile repo. Last error:\n{result.stderr}"
+                    f"Failed to clone task repo. Last error:\n{result.stderr}"
                 )
         yield Path(tmpdir)
 

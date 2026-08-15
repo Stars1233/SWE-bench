@@ -32,9 +32,8 @@ def eval_command(
     task_repo: Optional[str] = typer.Option(
         None,
         "--task-repo",
-        "--dockerfile-repo",
         help=(
-            "Build images from this dockerfile repo instead of trusting the registry. "
+            "Build images from this task repo instead of trusting the registry. "
             "Without it images are pulled, so a stale published image can mask a broken "
             "build; failed builds are reported and only fall back to a published image "
             "when one exists."

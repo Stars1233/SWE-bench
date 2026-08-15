@@ -11,6 +11,7 @@ Breaking changes:
 * `--assets_dir` is gone. Binary patch assets come from `tasks/<instance_id>/assets/`, and no longer need a url.
 * Dataset aliases are now `full`, `verified`, `multilingual` and `multimodal`. Any other name, including a full HuggingFace id, is used as given.
 * `prepare_images.main()` takes `task_repo` instead of `dataset_name` and `split`.
+* `--dockerfile-repo` and `SWEBENCH_DOCKERFILE_REPOS` are gone; use `--task-repo`. `swebench.collect.build_local_datasets` is removed, since `swebench dataset build` compiles from a task repo.
 * A task repo can publish several datasets: `sweb.yaml` names them all, each task lists the ones it belongs to, and `-d/--dataset` narrows any build, diff, push or image command. Verified and Lite are subsets of the same instances rather than copies of them.
 * Task repo code moved into `swebench.task`: `swebench.task.repo`, `swebench.task.checks`, `swebench.task.publish`.
 * Removed `swebench.constants`, which nothing imported.

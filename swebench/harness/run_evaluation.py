@@ -585,7 +585,7 @@ def get_dataset_from_preds(
 
 
 def _build_before_eval(dataset, dataset_name, split, task_repo, max_workers, client):
-    """Build this run's images from a dockerfile repo instead of trusting the registry.
+    """Build this run's images from a task repo instead of trusting the registry.
 
     Without this a failed build is invisible: the image is pulled instead, so a stale
     published image can report a clean pass. Verification is by the image name the
