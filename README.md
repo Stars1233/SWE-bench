@@ -64,7 +64,7 @@ pip install -e .
 
 Test your installation by running:
 ```bash
-swebench eval lite --gold -i sympy__sympy-20590 --run-id validate-gold
+swebench eval verified --gold -i sympy__sympy-20590 --run-id validate-gold
 ```
 > [!NOTE]
 > If using a MacOS M-series or other ARM-based systems, add `--namespace ''` to the above script.
@@ -72,18 +72,18 @@ swebench eval lite --gold -i sympy__sympy-20590 --run-id validate-gold
 > Adding `--namespace ''` will cause evaluation images to be built locally instead.
 
 ## 💽 Usage
-Evaluate patch predictions on SWE-bench Lite with the following command:
+Evaluate patch predictions with the following command:
 ```bash
-swebench eval lite -p <path_to_predictions> --run-id <run_id> -j <num_workers>
+swebench eval verified -p <path_to_predictions> --run-id <run_id> -j <num_workers>
 ```
 
-`DATASET` accepts an alias (`full`, `lite`, `verified`, `multimodal`, `multilingual`), a
-HuggingFace id, or a local path:
+`DATASET` accepts an alias (`full`, `verified`, `multimodal`, `multilingual`), a
+HuggingFace id, or a local path. Anything else is passed through as given, so
+`SWE-bench/SWE-bench_Lite` works too:
 
 ```bash
 swebench eval verified --gold                 # reference patches
 swebench eval multimodal --gold -i carbon-design-system__carbon-10188
-swebench eval full -p preds.jsonl --modal     # run on Modal
 swebench report <run_id> -d verified          # re-grade saved logs, no containers
 ```
 
