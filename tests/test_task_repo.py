@@ -30,7 +30,7 @@ def _config(repo, dataset="x/y-dataset", splits=("test",)):
 
 def _task(repo, instance_id, **overrides):
     d = repo / "tasks" / instance_id
-    (d / "assets").mkdir(parents=True)
+    (d / "test_assets").mkdir(parents=True)
     meta = {
         "instance_id": instance_id,
         "repo": "x/y",
@@ -102,7 +102,7 @@ def test_dockerfiles_are_keyed_by_instance_id(tmp_path):
 def test_assets_live_under_the_task(tmp_path):
     _task(tmp_path, "a__a-1")
     p = asset_path(tmp_path, "a__a-1", "rendering/expected.png")
-    assert p == tmp_path / "tasks" / "a__a-1" / "assets" / "rendering" / "expected.png"
+    assert p == tmp_path / "tasks" / "a__a-1" / "test_assets" / "rendering" / "expected.png"
 
 
 def test_a_directory_without_task_json_is_not_a_task(tmp_path):

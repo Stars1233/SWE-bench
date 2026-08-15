@@ -12,7 +12,9 @@ A task repo holds one directory per instance::
         test.patch            the tests that grade it
         eval.sh               the script the harness runs
         Dockerfile            the image it runs in
-        assets/               binary files a patch cannot carry, e.g. expected.png
+        test_assets/          binary files a patch cannot carry, staged at eval time
+        problem_assets/       what the problem statement links to, archived so it
+                              cannot rot; the harness never reads these
 
 Nothing here consults HuggingFace: a task repo can rebuild its dataset alone,
 which is what makes local development of a new dataset possible.
@@ -26,7 +28,7 @@ from pathlib import Path
 import yaml
 
 TASKS_SUBDIR = "tasks"
-ASSETS_SUBDIR = "assets"
+ASSETS_SUBDIR = "test_assets"
 
 # dataset columns kept as their own file rather than inside task.yaml
 AS_FILE = {
@@ -147,7 +149,7 @@ def load_dockerfiles(
 
 
 def asset_path(repo_path: str | Path, instance_id: str, path: str) -> Path:
-    """Where a task's binary asset lives, e.g. tasks/<id>/assets/<path>."""
+    """Where a staged asset lives: tasks/<id>/test_assets/<path in the repo>."""
     return tasks_root(repo_path) / instance_id / ASSETS_SUBDIR / path
 
 
