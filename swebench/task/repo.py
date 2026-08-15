@@ -2,7 +2,7 @@
 
 A task repo holds one directory per instance::
 
-    sweb.yaml             the dataset this repo publishes, and its splits
+    sweb.yaml             the datasets this repo publishes, and their splits
     tasks/<instance_id>/
         task.yaml             short metadata, including which split the task is in
         tests.json            the tests that decide whether a patch resolved it
@@ -40,6 +40,15 @@ OPTIONAL_FILE = {"hints_text": "hints.md"}
 # JSON rather than YAML: these are arbitrary strings, sometimes pasted in by hand,
 # and JSON has no implicit typing to turn `no` or `1.0` into something else
 TESTS_FILE = "tests.json"
+
+
+class UnknownDataset(KeyError):
+    """Asked for a dataset the repo does not publish."""
+
+    def __str__(self) -> str:  # KeyError quotes its message otherwise
+        return self.args[0]
+
+
 TEST_KEYS = ("FAIL_TO_PASS", "PASS_TO_PASS")
 CONFIG_FILE = "sweb.yaml"
 TASK_FILE = "task.yaml"
@@ -152,29 +161,47 @@ def load_config(repo_path: str | Path) -> dict:
     if not path.is_file():
         raise FileNotFoundError(f"{repo_path} has no {CONFIG_FILE}")
     config = load_yaml(path)
-    if not config.get("dataset"):
-        raise ValueError(f"{path} does not name a dataset")
+    if not config.get("datasets"):
+        raise ValueError(f"{path} does not name any datasets")
     config.setdefault("splits", ["test"])
     return config
 
 
-def published_tasks(repo_path: str | Path) -> dict[str, list[dict]]:
-    """Instances grouped by split, skipping splits the repo does not publish.
+def published_tasks(
+    repo_path: str | Path, datasets: list[str] | None = None
+) -> dict[str, dict[str, list[dict]]]:
+    """Instances grouped by dataset, then by split.
 
-    A task in an unpublished split (e.g. deprecated) stays in the tree and can
-    still be built by id; it just never reaches the dataset.
+    A task names the datasets it belongs to, because subsets like Verified and
+    Lite are drawn from the same instances: one copy of the data, many datasets.
+    A task in an unpublished split (deprecated, say) stays in the tree and can
+    still be built by id, but never reaches a dataset.
     """
-    splits = set(load_config(repo_path)["splits"])
-    grouped: dict[str, list[dict]] = {s: [] for s in splits}
+    config = load_config(repo_path)
+    wanted = set(datasets or config["datasets"])
+    unknown = wanted - set(config["datasets"])
+    if unknown:
+        raise UnknownDataset(
+            f"{Path(repo_path) / CONFIG_FILE} does not publish "
+            f"{' '.join(sorted(unknown))}. It publishes: "
+            f"{' '.join(config['datasets'])}"
+        )
+    splits = set(config["splits"])
+
+    grouped: dict[str, dict[str, list[dict]]] = {d: {} for d in sorted(wanted)}
     for instance in load_task_repo(repo_path):
         split = instance.get("split")
-        if split in splits:
-            grouped[split].append(instance)
+        if split not in splits:
+            continue
+        for dataset in set(instance.get("datasets") or []) & wanted:
+            grouped[dataset].setdefault(split, []).append(instance)
     return grouped
 
 
 def select_tasks(
-    repo_path: str | Path, instance_ids: list[str] | None = None
+    repo_path: str | Path,
+    instance_ids: list[str] | None = None,
+    datasets: list[str] | None = None,
 ) -> list[dict]:
     """The tasks a command should act on.
 
@@ -184,8 +211,10 @@ def select_tasks(
     """
     if instance_ids:
         return load_task_repo(repo_path, instance_ids)
-    return [
-        instance
-        for instances in published_tasks(repo_path).values()
-        for instance in instances
-    ]
+    # an instance can belong to several datasets, so keep one copy of each
+    seen: dict[str, dict] = {}
+    for by_split in published_tasks(repo_path, datasets).values():
+        for instances in by_split.values():
+            for instance in instances:
+                seen.setdefault(instance["instance_id"], instance)
+    return [seen[i] for i in sorted(seen)]

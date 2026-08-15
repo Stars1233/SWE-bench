@@ -16,7 +16,7 @@ from pathlib import Path
 
 import yaml
 
-from swebench.task_repo import (
+from swebench.task.repo import (
     AS_FILE,
     CONFIG_FILE,
     TASK_FILE,
@@ -69,7 +69,9 @@ def expected_image(instance_id: str, namespace: str = "swebench") -> str:
     return f"{namespace}/{key}".replace("__", "_1776_")
 
 
-def _check_task(task_dir: Path, known_splits: set[str]) -> list[Problem]:
+def _check_task(
+    task_dir: Path, known_splits: set[str], known_datasets: set[str]
+) -> list[Problem]:
     problems = []
     where = f"tasks/{task_dir.name}"
 
@@ -113,6 +115,20 @@ def _check_task(task_dir: Path, known_splits: set[str]) -> list[Problem]:
                 Problem(where, "no FAIL_TO_PASS, so nothing grades this task")
             )
 
+    claimed = meta.get("datasets")
+    if not claimed and meta.get("split") != DEPRECATED_SPLIT:
+        problems.append(
+            Problem(where, f"{TASK_FILE} does not say which datasets it belongs to")
+        )
+    elif not isinstance(claimed, list):
+        problems.append(Problem(where, "datasets is not a list"))
+    else:
+        unknown = sorted(set(claimed) - known_datasets)
+        if unknown:
+            problems.append(
+                Problem(where, f"datasets not published by {CONFIG_FILE}: {' '.join(unknown)}")
+            )
+
     split = meta.get("split")
     if split is not None and split not in known_splits | {DEPRECATED_SPLIT}:
         problems.append(
@@ -149,6 +165,7 @@ def check_task_repo(repo_path: str | Path, fix: bool = False) -> list[Problem]:
     try:
         config = load_config(repo_path)
         known_splits = set(config["splits"])
+        known_datasets = set(config["datasets"])
     except (FileNotFoundError, ValueError) as e:
         return [Problem(CONFIG_FILE, str(e))]
 
@@ -160,7 +177,7 @@ def check_task_repo(repo_path: str | Path, fix: bool = False) -> list[Problem]:
         return [Problem("tasks/", "no task directories")]
 
     for task_dir in dirs:
-        problems.extend(_check_task(task_dir, known_splits))
+        problems.extend(_check_task(task_dir, known_splits, known_datasets))
 
     # splits are derivable from the tree, so an unregistered one can be filled in
     if fix:

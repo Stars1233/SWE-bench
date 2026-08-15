@@ -10,13 +10,13 @@ import json
 import pytest
 import yaml
 
-from swebench.task_checks import check_task_repo, errors, expected_image
-from swebench.task_publish import CheckFailed, compile_splits, guard
+from swebench.task.checks import check_task_repo, errors, expected_image
+from swebench.task.publish import CheckFailed, compile_datasets, guard
 
 
 def _repo(tmp_path, splits=("test",), **task_overrides):
     (tmp_path / "sweb.yaml").write_text(
-        yaml.safe_dump({"dataset": "SWE-bench/Example", "splits": list(splits)})
+        yaml.safe_dump({"datasets": ["SWE-bench/Example"], "splits": list(splits)})
     )
     return tmp_path
 
@@ -33,6 +33,7 @@ def _task(repo, instance_id, split="test", **overrides):
         "image": expected_image(instance_id),
         "log_parser": "parse_log_pytest",
         "eval_type": "pass_and_fail",
+        "datasets": ["SWE-bench/Example"],
         "FAIL_TO_PASS": ["test_a"],
         "PASS_TO_PASS": [],
         **overrides,
@@ -66,19 +67,20 @@ def test_compile_groups_by_split_and_drops_the_split_key(tmp_path):
     repo = _repo(tmp_path, splits=("dev", "test"))
     _task(repo, "a__a-1", split="test")
     _task(repo, "b__b-2", split="dev")
-    splits = compile_splits(tmp_path)
-    assert sorted(splits) == ["dev", "test"]
-    # `split` tells us which parquet to write, it is not a dataset column
-    assert "split" not in splits["test"][0]
-    assert splits["test"][0]["instance_id"] == "a__a-1"
+    compiled = compile_datasets(tmp_path)["SWE-bench/Example"]
+    assert sorted(compiled) == ["dev", "test"]
+    # `split` and `datasets` route a task; they are not dataset columns
+    assert "split" not in compiled["test"][0]
+    assert "datasets" not in compiled["test"][0]
+    assert compiled["test"][0]["instance_id"] == "a__a-1"
 
 
 def test_deprecated_tasks_are_not_compiled(tmp_path):
     repo = _repo(tmp_path)
     _task(repo, "a__a-1")
     _task(repo, "b__b-2", split="deprecated", FAIL_TO_PASS=[])
-    splits = compile_splits(tmp_path)
-    assert [r["instance_id"] for r in splits["test"]] == ["a__a-1"]
+    compiled = compile_datasets(tmp_path)["SWE-bench/Example"]
+    assert [r["instance_id"] for r in compiled["test"]] == ["a__a-1"]
 
 
 def test_publishing_a_malformed_repo_is_refused(tmp_path):
@@ -86,7 +88,7 @@ def test_publishing_a_malformed_repo_is_refused(tmp_path):
     _task(repo, "a__a-1")
     (repo / "tasks" / "a__a-1" / "eval.sh").unlink()
     with pytest.raises(CheckFailed, match="eval.sh"):
-        compile_splits(tmp_path)
+        compile_datasets(tmp_path)
 
 
 def test_an_empty_fail_to_pass_blocks_publishing(tmp_path):
@@ -132,3 +134,34 @@ def test_a_directory_without_task_json_is_reported(tmp_path):
     _task(repo, "a__a-1")
     (repo / "tasks" / "leftovers").mkdir()
     assert any("not a task" in p.message for p in check_task_repo(tmp_path))
+
+
+def test_one_tree_can_publish_several_datasets(tmp_path):
+    """Verified and Lite are subsets of the same instances, not copies of them."""
+    (tmp_path / "sweb.yaml").write_text(
+        yaml.safe_dump({"datasets": ["org/base", "org/subset"], "splits": ["test"]})
+    )
+    _task(tmp_path, "a__a-1", datasets=["org/base", "org/subset"])
+    _task(tmp_path, "b__b-2", datasets=["org/base"])
+
+    compiled = compile_datasets(tmp_path)
+    assert [r["instance_id"] for r in compiled["org/base"]["test"]] == ["a__a-1", "b__b-2"]
+    assert [r["instance_id"] for r in compiled["org/subset"]["test"]] == ["a__a-1"]
+
+
+def test_a_task_claiming_an_unpublished_dataset_is_reported(tmp_path):
+    repo = _repo(tmp_path)
+    _task(repo, "a__a-1", datasets=["SWE-bench/Example", "org/nope"])
+    assert any("not published by" in p.message for p in check_task_repo(tmp_path))
+
+
+def test_selecting_one_dataset_narrows_the_build(tmp_path):
+    (tmp_path / "sweb.yaml").write_text(
+        yaml.safe_dump({"datasets": ["org/base", "org/subset"], "splits": ["test"]})
+    )
+    _task(tmp_path, "a__a-1", datasets=["org/base", "org/subset"])
+    _task(tmp_path, "b__b-2", datasets=["org/base"])
+
+    only = compile_datasets(tmp_path, ["org/subset"])
+    assert list(only) == ["org/subset"]
+    assert [r["instance_id"] for r in only["org/subset"]["test"]] == ["a__a-1"]

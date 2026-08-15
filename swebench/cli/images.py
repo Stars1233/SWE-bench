@@ -17,6 +17,9 @@ def build(
     task_repo: str = typer.Argument(
         ..., metavar="TASK_REPO", help="Path to a task repo"
     ),
+    datasets: Optional[list[str]] = typer.Option(
+        None, "-d", "--dataset", help="Only these datasets (repeatable)"
+    ),
     instance_ids: Optional[list[str]] = typer.Option(
         None, "-i", "--instance", help="Only these instances (repeatable)"
     ),
@@ -43,23 +46,33 @@ def build(
         swebench images build ~/swe-bench-tasks --dry-run
     """
     from swebench.image_builder.prepare_images import main as prepare_images
+    from swebench.task.publish import CheckFailed
+    from swebench.task.repo import UnknownDataset
 
-    prepare_images(
-        task_repo=task_repo,
-        instance_ids=list(instance_ids) if instance_ids else None,
-        max_workers=workers,
-        force_rebuild=force_rebuild,
-        open_file_limit=open_file_limit,
-        namespace=namespace,
-        tag=tag,
-        dry_run=dry_run,
-    )
+    try:
+        prepare_images(
+            task_repo=task_repo,
+            instance_ids=list(instance_ids) if instance_ids else None,
+            datasets=list(datasets) if datasets else None,
+            max_workers=workers,
+            force_rebuild=force_rebuild,
+            open_file_limit=open_file_limit,
+            namespace=namespace,
+            tag=tag,
+            dry_run=dry_run,
+        )
+    except (CheckFailed, UnknownDataset) as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1) from e
 
 
 @images_app.command("check")
 def check(
     task_repo: str = typer.Argument(
         ..., metavar="TASK_REPO", help="Path to a task repo"
+    ),
+    datasets: Optional[list[str]] = typer.Option(
+        None, "-d", "--dataset", help="Only these datasets (repeatable)"
     ),
     instance_ids: Optional[list[str]] = typer.Option(
         None, "-i", "--instance", help="Only these instances (repeatable)"
@@ -81,10 +94,18 @@ def check(
 
     import docker
 
-    from swebench.task_repo import select_tasks
+    from swebench.task.repo import UnknownDataset, select_tasks
 
     client = docker.from_env()
-    instances = select_tasks(task_repo, list(instance_ids) if instance_ids else None)
+    try:
+        instances = select_tasks(
+            task_repo,
+            list(instance_ids) if instance_ids else None,
+            list(datasets) if datasets else None,
+        )
+    except UnknownDataset as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(1) from e
     names = sorted({i["image"] for i in instances if i.get("image")})
     if not names:
         typer.echo("dataset rows carry no image field")
@@ -140,6 +161,9 @@ def push(
     task_repo: str = typer.Argument(
         ..., metavar="TASK_REPO", help="Path to a task repo"
     ),
+    datasets: Optional[list[str]] = typer.Option(
+        None, "-d", "--dataset", help="Only these datasets (repeatable)"
+    ),
     instance_ids: Optional[list[str]] = typer.Option(
         None, "-i", "--instance", help="Only these instances (repeatable)"
     ),
@@ -156,15 +180,17 @@ def push(
 
         swebench images push ~/swe-bench-multilingual-tasks -i google__gson-2479
     """
-    from swebench.task_publish import CheckFailed, push_images, summarize
+    from swebench.task.publish import CheckFailed, push_images, summarize
+    from swebench.task.repo import UnknownDataset
 
     try:
         plan = push_images(
             task_repo,
             instance_ids=list(instance_ids) if instance_ids else None,
             dry_run=dry_run,
+            datasets=list(datasets) if datasets else None,
         )
-    except CheckFailed as e:
+    except (CheckFailed, UnknownDataset) as e:
         typer.echo(str(e), err=True)
         raise typer.Exit(1) from e
     typer.echo(summarize(plan))

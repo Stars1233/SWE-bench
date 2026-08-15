@@ -9,7 +9,7 @@ import json
 import pytest
 import yaml
 
-from swebench.task_repo import (
+from swebench.task.repo import (
     asset_path,
     load_config,
     load_dockerfiles,
@@ -24,7 +24,7 @@ CRLF_PATCH = "diff --git a/x b/x\r\n--- a/x\r\n+++ b/x\r\n+one\r\n"
 
 def _config(repo, dataset="x/y-dataset", splits=("test",)):
     (repo / "sweb.yaml").write_text(
-        yaml.safe_dump({"dataset": dataset, "splits": list(splits)})
+        yaml.safe_dump({"datasets": [dataset], "splits": list(splits)})
     )
 
 
@@ -36,6 +36,7 @@ def _task(repo, instance_id, **overrides):
         "repo": "x/y",
         "version": "1.0",
         "split": "test",
+        "datasets": ["x/y-dataset"],
         **overrides,
     }
     tests = {k: meta.pop(k) for k in ("FAIL_TO_PASS", "PASS_TO_PASS") if k in meta}
@@ -117,13 +118,13 @@ def test_missing_tasks_directory_is_an_error(tmp_path):
 
 def test_config_names_the_destination(tmp_path):
     _config(tmp_path, dataset="SWE-bench/Example", splits=("dev", "test"))
-    assert load_config(tmp_path)["dataset"] == "SWE-bench/Example"
+    assert load_config(tmp_path)["datasets"] == ["SWE-bench/Example"]
     assert load_config(tmp_path)["splits"] == ["dev", "test"]
 
 
 def test_config_without_a_dataset_is_an_error(tmp_path):
     (tmp_path / "sweb.yaml").write_text(yaml.safe_dump({"splits": ["test"]}))
-    with pytest.raises(ValueError, match="does not name a dataset"):
+    with pytest.raises(ValueError, match="does not name any datasets"):
         load_config(tmp_path)
 
 
@@ -131,7 +132,7 @@ def test_tasks_group_by_split(tmp_path):
     _config(tmp_path, splits=("dev", "test"))
     _task(tmp_path, "a__a-1", split="test")
     _task(tmp_path, "b__b-2", split="dev")
-    grouped = published_tasks(tmp_path)
+    grouped = published_tasks(tmp_path)["x/y-dataset"]
     assert [i["instance_id"] for i in grouped["test"]] == ["a__a-1"]
     assert [i["instance_id"] for i in grouped["dev"]] == ["b__b-2"]
 
@@ -141,7 +142,7 @@ def test_unpublished_splits_stay_out_of_the_dataset(tmp_path):
     _config(tmp_path, splits=("test",))
     _task(tmp_path, "a__a-1", split="test")
     _task(tmp_path, "b__b-2", split="deprecated")
-    grouped = published_tasks(tmp_path)
+    grouped = published_tasks(tmp_path)["x/y-dataset"]
     assert [i["instance_id"] for i in grouped["test"]] == ["a__a-1"]
     assert "deprecated" not in grouped
     # still present in the tree, so it can be built by id

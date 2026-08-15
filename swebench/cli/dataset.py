@@ -5,6 +5,10 @@ from typing import Optional
 import typer
 
 
+def _list(values) -> list[str] | None:
+    return list(values) if values else None
+
+
 def _fail(error: Exception) -> int:
     typer.echo(str(error), err=True)
     return 1
@@ -23,6 +27,9 @@ def build(
     task_repo: str = typer.Argument(
         ..., metavar="TASK_REPO", help="Path to a task repo"
     ),
+    datasets: Optional[list[str]] = typer.Option(
+        None, "-d", "--dataset", help="Only these datasets (repeatable)"
+    ),
     out: str = typer.Option("data", "-o", "--out", help="Where to write the parquets"),
 ):
     """Compile a task repo into one parquet per split.
@@ -36,11 +43,12 @@ def build(
 
         swebench dataset build ~/swe-bench-tasks -o /tmp/parquets
     """
-    from swebench.task_publish import CheckFailed, write_parquets
+    from swebench.task.publish import CheckFailed, write_parquets
+    from swebench.task.repo import UnknownDataset
 
     try:
-        written = write_parquets(task_repo, out)
-    except CheckFailed as e:
+        written = write_parquets(task_repo, out, _list(datasets))
+    except (CheckFailed, UnknownDataset) as e:
         raise typer.Exit(_fail(e)) from e
     for split, path in written.items():
         typer.echo(f"{split}: {path}")
@@ -65,7 +73,7 @@ def check(
 
         swebench dataset check ~/swe-bench-tasks --fix
     """
-    from swebench.task_checks import check_task_repo, errors
+    from swebench.task.checks import check_task_repo, errors
 
     problems = check_task_repo(task_repo, fix=fix)
     for problem in problems:
@@ -84,6 +92,9 @@ def diff(
     task_repo: str = typer.Argument(
         ..., metavar="TASK_REPO", help="Path to a task repo"
     ),
+    datasets: Optional[list[str]] = typer.Option(
+        None, "-d", "--dataset", help="Only these datasets (repeatable)"
+    ),
 ):
     """Show how a task repo differs from the dataset it publishes.
 
@@ -91,11 +102,12 @@ def diff(
 
         swebench dataset diff ~/swe-bench-multilingual-tasks
     """
-    from swebench.task_publish import CheckFailed, diff_against_hub, summarize
+    from swebench.task.publish import CheckFailed, diff_against_hub, summarize
+    from swebench.task.repo import UnknownDataset
 
     try:
-        typer.echo(summarize(diff_against_hub(task_repo)))
-    except CheckFailed as e:
+        typer.echo(summarize(diff_against_hub(task_repo, _list(datasets))))
+    except (CheckFailed, UnknownDataset) as e:
         raise typer.Exit(_fail(e)) from e
 
 
@@ -103,6 +115,9 @@ def diff(
 def push(
     task_repo: str = typer.Argument(
         ..., metavar="TASK_REPO", help="Path to a task repo"
+    ),
+    datasets: Optional[list[str]] = typer.Option(
+        None, "-d", "--dataset", help="Only these datasets (repeatable)"
     ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would be pushed"),
 ):
@@ -114,11 +129,12 @@ def push(
 
         swebench dataset push ~/swe-bench-multilingual-tasks
     """
-    from swebench.task_publish import CheckFailed, push_dataset, summarize
+    from swebench.task.publish import CheckFailed, push_dataset, summarize
+    from swebench.task.repo import UnknownDataset
 
     try:
-        typer.echo(summarize(push_dataset(task_repo, dry_run=dry_run)))
-    except CheckFailed as e:
+        typer.echo(summarize(push_dataset(task_repo, _list(datasets), dry_run=dry_run)))
+    except (CheckFailed, UnknownDataset) as e:
         raise typer.Exit(_fail(e)) from e
 
 

@@ -38,7 +38,7 @@ from swebench.harness.modal_eval import (
 )
 from swebench.types import TestSpec
 from swebench.harness.utils import make_test_spec
-from swebench.task_repo import asset_path, load_task_repo
+from swebench.task.repo import asset_path, load_task_repo
 from swebench.harness.utils import (
     EvaluationError,
     load_swebench_dataset,
@@ -594,7 +594,7 @@ def _build_before_eval(dataset, dataset_name, split, task_repo, max_workers, cli
     from swebench.image_builder.docker_build import build_instance_images
     from swebench.image_builder.image_spec import get_image_specs_from_dataset
     from swebench.image_builder.prepare_images import resolve_task_repo
-    from swebench.task_repo import load_dockerfiles
+    from swebench.task.repo import load_dockerfiles
 
     wanted = {d["instance_id"]: make_test_spec(d).image for d in dataset}
     # namespace and tag come from the image the dataset names, so built tags match

@@ -12,8 +12,8 @@ from swebench.image_builder.image_spec import get_image_specs_from_dataset
 from swebench.image_builder.docker_build import build_instance_images
 from swebench.image_builder.docker_utils import list_images
 from swebench.harness.utils import optional_str, str2bool
-from swebench.task_publish import guard
-from swebench.task_repo import load_dockerfiles, select_tasks
+from swebench.task.publish import guard
+from swebench.task.repo import load_dockerfiles, select_tasks
 
 
 def _is_github_ref(task_repo: str) -> bool:
@@ -105,6 +105,7 @@ def filter_image_specs(
 def main(
     task_repo,
     instance_ids,
+    datasets,
     max_workers,
     force_rebuild,
     open_file_limit,
@@ -118,6 +119,7 @@ def main(
     Args:
         task_repo (str): Task repo reference — a local path, GitHub "owner/repo", or GitHub URL.
         instance_ids (list): Only these instances; without them, everything the repo publishes.
+        datasets (list): Only tasks belonging to these datasets.
         max_workers (int): Number of workers for parallel processing.
         force_rebuild (bool): Whether to force rebuild all images.
         open_file_limit (int): Open file limit.
@@ -131,7 +133,7 @@ def main(
 
     with resolve_task_repo(task_repo) as repo_path:
         guard(repo_path)
-        dataset = select_tasks(repo_path, instance_ids)
+        dataset = select_tasks(repo_path, instance_ids, datasets)
         dockerfiles = load_dockerfiles(repo_path, [i["instance_id"] for i in dataset])
     image_specs = get_image_specs_from_dataset(dataset, dockerfiles, namespace, tag)
     image_specs = filter_image_specs(image_specs, client, force_rebuild)
