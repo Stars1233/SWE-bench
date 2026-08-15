@@ -81,10 +81,13 @@ def eval_command(
 
 def report_command(
     run_id: str = typer.Argument(..., help="Run id to re-grade"),
-    dataset: str = typer.Option(
-        "verified", "-d", "--dataset", help="Dataset the run used"
+    dataset: Optional[str] = typer.Option(
+        None,
+        "-d",
+        "--dataset",
+        help="Dataset the run used; taken from the run if omitted",
     ),
-    split: str = typer.Option("test", "-s", "--split"),
+    split: Optional[str] = typer.Option(None, "-s", "--split"),
     instance_ids: Optional[list[str]] = typer.Option(None, "-i", "--instance"),
     report_dir: str = typer.Option(".", "--report-dir"),
 ):
@@ -100,6 +103,20 @@ def report_command(
         swebench report my-run -d multimodal -i grommet__grommet-6282
     """
     from swebench.harness.run_evaluation import main as run_evaluation
+    from swebench.harness.run_evaluation import read_run_metadata
+
+    recorded = read_run_metadata(run_id) or {}
+    if dataset is None:
+        if not recorded.get("dataset"):
+            typer.echo(
+                f"Run {run_id!r} did not record which dataset it used, so pass -d. "
+                "Runs made before this was added have no record of it.",
+                err=True,
+            )
+            raise typer.Exit(1)
+        dataset = recorded["dataset"]
+    if split is None:
+        split = recorded.get("split", "test")
 
     run_evaluation(
         dataset_name=resolve_dataset(dataset),

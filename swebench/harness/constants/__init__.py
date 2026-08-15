@@ -35,6 +35,8 @@ PASS_TO_FAIL = "PASS_TO_FAIL"
 # Constants - Evaluation Execution
 CONTAINER_PATCH_FILE = "/tmp/patch.diff"
 LOG_REPORT = "report.json"
+# what a run was: written at eval time so `swebench report` can re-grade it later
+LOG_RUN_METADATA = "run.json"
 LOG_INSTANCE = "run_instance.log"
 LOG_TEST_OUTPUT = "test_output.txt"
 

@@ -22,6 +22,7 @@ Breaking changes:
 * Committed dataset parquets removed. HuggingFace is the source of truth.
 
 Added:
+* A run records the dataset and split it graded against, in `logs/run_evaluation/<run_id>/run.json`, so `swebench report <run_id>` no longer needs `-d`. Runs made before this still need it.
 * A `swebench` CLI, with grouped commands and worked examples in the help text.
 * SWE-bench Multimodal test-split support, including its log parsers and image assets. `--assets_dir` loads binary assets from disk when a URL has gone stale.
 

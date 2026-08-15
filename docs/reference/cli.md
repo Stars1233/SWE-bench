@@ -34,8 +34,12 @@ Recompute verdicts from a finished run's saved logs, without starting
 containers. Useful after a log-parser fix, since the test output is already on
 disk.
 
+The dataset comes from the run itself, recorded at evaluation time in
+`logs/run_evaluation/<run_id>/run.json`. Pass `-d` for runs made before that was
+added, or to grade against a different dataset on purpose.
+
 ```bash
-swebench report my-run -d verified
+swebench report my-run                     # dataset taken from the run itself
 swebench report my-run -d multimodal -i grommet__grommet-6282
 ```
 

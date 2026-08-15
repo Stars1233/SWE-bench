@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import docker
 import json
+from datetime import datetime, timezone
 import os
 import platform
 import urllib.request
@@ -19,6 +20,7 @@ from swebench.harness.constants import (
     APPLY_PATCH_PASS,
     CONTAINER_PATCH_FILE,
     LOG_REPORT,
+    LOG_RUN_METADATA,
     LOG_INSTANCE,
     LOG_TEST_OUTPUT,
     RUN_EVALUATION_LOG_DIR,
@@ -474,6 +476,38 @@ def run_instances(
     print("All instances run.")
 
 
+def write_run_metadata(
+    run_id: str, dataset_name: str, split: str, task_repo: str | None
+) -> Path:
+    """Record what this run graded against.
+
+    Re-grading needs the expected tests and the log parser, which live in the
+    dataset, not in the run's logs. Without this a later `swebench report` has to
+    be told the dataset again, and gets it wrong silently if told the wrong one.
+    """
+    path = RUN_EVALUATION_LOG_DIR / run_id / LOG_RUN_METADATA
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "dataset": dataset_name,
+                "split": split,
+                "task_repo": task_repo,
+                "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+    return path
+
+
+def read_run_metadata(run_id: str) -> dict | None:
+    """What a previous run graded against, if it recorded it."""
+    path = RUN_EVALUATION_LOG_DIR / run_id / LOG_RUN_METADATA
+    return json.loads(path.read_text()) if path.is_file() else None
+
+
 def load_instances(
     dataset_name: str, split: str, instance_ids: list | None, task_repo: str | None
 ) -> list:
@@ -670,6 +704,7 @@ def main(
     # load predictions as map of instance_id to prediction
     predictions = get_predictions_from_file(predictions_path, dataset_name, split)
     predictions = {pred["instance_id"]: pred for pred in predictions}
+    write_run_metadata(run_id, dataset_name, split, task_repo)
 
     # get dataset from predictions
     dataset = get_dataset_from_preds(
