@@ -16,7 +16,7 @@ from swebench.task.repo import published_tasks, select_tasks
 
 # `split` says which parquet a task belongs in; it is not a dataset column
 # these route a task to its parquet; they are not dataset columns
-INTERNAL_KEYS = ("split", "datasets")
+INTERNAL_KEYS = ("split", "datasets", "empty_fail_to_pass")
 
 # the eval card a dataset publishes alongside its rows, one per dataset:
 # eval/SWE-bench_Lite.yaml

@@ -32,6 +32,13 @@ from swebench.task.repo import (
 # kept in the tree but deliberately not published, e.g. instances that were dropped
 DEPRECATED_SPLIT = "deprecated"
 
+# A task normally needs a FAIL_TO_PASS test, or every submission grades as resolved.
+# A few are checked by whether the code builds at all -- tokio-rs__axum-1730 adds a
+# function that only has to type check, and without its patch the crate does not
+# compile, so every PASS_TO_PASS test fails. Those say so here, in prose, so the
+# exemption is a decision someone wrote down rather than an empty list.
+EMPTY_F2P_KEY = "empty_fail_to_pass"
+
 REQUIRED_FILES = (TASK_FILE, TESTS_FILE, "Dockerfile", *AS_FILE.values())
 REQUIRED_KEYS = (
     "instance_id",
@@ -110,9 +117,17 @@ def _check_task(
                 problems.append(
                     Problem(where, f"{key} holds something that is not a string")
                 )
-        if tests.get(TEST_KEYS[0]) == [] and meta.get("split") != DEPRECATED_SPLIT:
+        if (
+            tests.get(TEST_KEYS[0]) == []
+            and meta.get("split") != DEPRECATED_SPLIT
+            and not meta.get(EMPTY_F2P_KEY)
+        ):
             problems.append(
-                Problem(where, "no FAIL_TO_PASS, so nothing grades this task")
+                Problem(
+                    where,
+                    "no FAIL_TO_PASS, so nothing grades this task; if the build itself "
+                    f"is the check, say why in {EMPTY_F2P_KEY}",
+                )
             )
 
     claimed = meta.get("datasets")
