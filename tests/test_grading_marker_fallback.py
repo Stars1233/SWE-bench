@@ -79,3 +79,29 @@ def test_empty_results_with_runner_evidence_is_a_clean_run(tmp_path):
     )
     sm, found = get_logs_eval(_spec(), str(log))
     assert (sm, found) == ({}, True)
+
+
+def test_a_clean_jasmine_run_counts_as_having_run(tmp_path):
+    """marked's parser records failures only, so a passing suite parses to nothing.
+
+    Without positive evidence the suite ran, such a run is rejected and the
+    instance grades unresolved even though every test passed -- 14 markedjs
+    instances in SWE-bench_Multimodal dev fail this way.
+    """
+    log = tmp_path / "test_output.txt"
+    log.write_text(
+        f"{START_TEST_OUTPUT}\nStarted\n.....\n\n658 specs, 0 failures\n{END_TEST_OUTPUT}\n"
+    )
+    sm, found = get_logs_eval(
+        _spec(log_parser="parse_log_marked", eval_type="fail_only"), str(log)
+    )
+    assert found and sm == {}
+
+
+def test_a_suite_that_never_started_is_still_rejected(tmp_path):
+    log = tmp_path / "test_output.txt"
+    log.write_text(f"{START_TEST_OUTPUT}\nbrowser failed to launch\n{END_TEST_OUTPUT}\n")
+    sm, found = get_logs_eval(
+        _spec(log_parser="parse_log_marked", eval_type="fail_only"), str(log)
+    )
+    assert not found

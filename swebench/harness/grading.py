@@ -31,6 +31,9 @@ SUITE_RAN = re.compile(
     r"|Tests:\s+\d+"
     r"|Test Suites:"
     r"|^# tests \d+"
+    # jasmine (marked) prints only this line on a clean run; its parser records
+    # failures only, so without it an all-passing suite looks like it never ran
+    r"|\d+ specs?, \d+ failures?"
     # openlayers' rendering harness logs "<case>': ok" per passing case at
     # --log-level info; it records no failures otherwise, so this is the only
     # positive evidence a silent (all-passing) run actually executed
