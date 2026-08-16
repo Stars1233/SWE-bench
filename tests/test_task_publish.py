@@ -11,7 +11,12 @@ import pytest
 import yaml
 
 from swebench.task.checks import check_task_repo, errors, expected_image
-from swebench.task.publish import CheckFailed, compile_datasets, guard
+from swebench.task.publish import (
+    CheckFailed,
+    compile_datasets,
+    eval_config,
+    guard,
+)
 
 
 def _repo(tmp_path, splits=("test",), **task_overrides):
@@ -165,3 +170,32 @@ def test_selecting_one_dataset_narrows_the_build(tmp_path):
     only = compile_datasets(tmp_path, ["org/subset"])
     assert list(only) == ["org/subset"]
     assert [r["instance_id"] for r in only["org/subset"]["test"]] == ["a__a-1"]
+
+
+def test_each_dataset_gets_its_own_eval_card(tmp_path):
+    """Lite and the full set are different benchmarks to a leaderboard."""
+    (tmp_path / "sweb.yaml").write_text(
+        yaml.safe_dump({"datasets": ["org/base", "org/subset"], "splits": ["test"]})
+    )
+    (tmp_path / "eval").mkdir()
+    (tmp_path / "eval" / "subset.yaml").write_text("name: Subset\n")
+
+    assert eval_config(tmp_path, "org/subset") == tmp_path / "eval" / "subset.yaml"
+    assert eval_config(tmp_path, "org/base") is None
+
+
+def test_a_repo_without_an_eval_card_publishes_none(tmp_path):
+    repo = _repo(tmp_path)
+    _task(repo, "a__a-1")
+    assert eval_config(repo, "SWE-bench/Example") is None
+
+
+def test_an_eval_card_naming_no_dataset_is_reported(tmp_path):
+    repo = _repo(tmp_path)
+    _task(repo, "a__a-1")
+    (repo / "eval").mkdir()
+    (repo / "eval" / "Exmaple.yaml").write_text("name: typo\n")
+    problems = check_task_repo(repo)
+    assert any("is not published" in p.message for p in problems)
+    # a stray card breaks nothing that runs, so it does not block a push
+    assert errors(problems) == []

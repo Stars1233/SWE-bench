@@ -18,6 +18,11 @@ from swebench.task.repo import published_tasks, select_tasks
 # these route a task to its parquet; they are not dataset columns
 INTERNAL_KEYS = ("split", "datasets")
 
+# the eval card a dataset publishes alongside its rows, one per dataset:
+# eval/SWE-bench_Lite.yaml
+EVAL_FILE = "eval.yaml"
+EVAL_SUBDIR = "eval"
+
 
 class CheckFailed(RuntimeError):
     """The repo is not well formed, so nothing was published."""
@@ -38,13 +43,34 @@ def _rows_for_split(instances: list[dict]) -> list[dict]:
     ]
 
 
+def _align_columns(by_split: dict[str, list[dict]]) -> dict[str, list[dict]]:
+    """Give every row in a dataset the same columns, null where a task has none.
+
+    Optional metadata like `difficulty` is only on some tasks, but a dataset has
+    one schema across its splits: a column present in test and absent in dev is
+    rejected by the hub. Filled empty rather than null, so the column keeps the
+    type it has on the tasks that do carry it.
+    """
+    empty = {str: "", list: [], dict: {}}
+    columns = {}
+    for rows in by_split.values():
+        for row in rows:
+            for column, value in row.items():
+                columns.setdefault(column, empty.get(type(value)))
+    return {
+        split: [{**columns, **row} for row in rows] for split, rows in by_split.items()
+    }
+
+
 def compile_datasets(
     repo_path: str | Path, datasets: list[str] | None = None
 ) -> dict[str, dict[str, list[dict]]]:
     """What this repo publishes: rows per dataset, per split."""
     guard(repo_path)
     return {
-        dataset: {split: _rows_for_split(rows) for split, rows in by_split.items()}
+        dataset: _align_columns(
+            {split: _rows_for_split(rows) for split, rows in by_split.items()}
+        )
         for dataset, by_split in published_tasks(repo_path, datasets).items()
     }
 
@@ -63,7 +89,22 @@ def write_parquets(
             path = out / f"{split}.parquet"
             pd.DataFrame(rows).to_parquet(path, index=False)
             written[f"{dataset}/{split}"] = path
+        card = eval_config(repo_path, dataset)
+        if card:
+            (out / EVAL_FILE).write_text(card.read_text())
+            written[f"{dataset}/{EVAL_FILE}"] = out / EVAL_FILE
     return written
+
+
+def eval_config(repo_path: str | Path, dataset: str) -> Path | None:
+    """The eval card this dataset publishes, if the repo has one.
+
+    One file per dataset, named for the dataset it belongs to, because Lite and
+    Verified are not the same benchmark to a leaderboard even though one tree
+    produces both.
+    """
+    path = Path(repo_path) / EVAL_SUBDIR / f"{dataset.split('/')[-1]}.yaml"
+    return path if path.is_file() else None
 
 
 def diff_against_hub(
@@ -102,21 +143,36 @@ def push_dataset(
 ) -> dict:
     """Overwrite the datasets named in sweb.yaml with the tree."""
     compiled = compile_datasets(repo_path, datasets)
+    cards = {name: eval_config(repo_path, name) for name in compiled}
     plan = {
         "datasets": {
             name: {split: len(rows) for split, rows in by_split.items()}
             for name, by_split in compiled.items()
         },
+        "eval_config": {name: str(path) for name, path in cards.items() if path},
         "diff": diff_against_hub(repo_path, datasets),
     }
     if dry_run:
         return plan
 
-    from datasets import Dataset
+    from datasets import Dataset, DatasetDict
+    from huggingface_hub import HfApi
 
     for name, by_split in compiled.items():
-        for split, rows in by_split.items():
-            Dataset.from_list(rows).push_to_hub(name, split=split)
+        # every split in one commit: pushing them one at a time leaves the splits
+        # that have not been pushed yet disagreeing with the ones that have, which
+        # the hub rejects
+        DatasetDict(
+            {split: Dataset.from_list(rows) for split, rows in by_split.items()}
+        ).push_to_hub(name)
+        # after the rows, so the card never lands on a dataset that failed to push
+        if cards[name]:
+            HfApi().upload_file(
+                path_or_fileobj=cards[name],
+                path_in_repo=EVAL_FILE,
+                repo_id=name,
+                repo_type="dataset",
+            )
     return plan
 
 

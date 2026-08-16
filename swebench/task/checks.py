@@ -212,6 +212,21 @@ def check_task_repo(repo_path: str | Path, fix: bool = False) -> list[Problem]:
                     )
                 ]
 
+    # an eval card is published under the name of its dataset, so one named
+    # anything else is a card that silently never reaches a dataset
+    published = {d.split("/")[-1] for d in known_datasets}
+    eval_dir = repo_path / "eval"
+    if eval_dir.is_dir():
+        problems.extend(
+            Problem(
+                f"eval/{path.name}",
+                f"no dataset named {path.stem} in {CONFIG_FILE}, so it is not published",
+                severity="warning",
+            )
+            for path in sorted(eval_dir.glob("*.yaml"))
+            if path.stem not in published
+        )
+
     # a directory with no task.yaml is invisible to the loaders, so say so
     strays = [
         d.name

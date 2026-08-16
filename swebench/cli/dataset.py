@@ -123,6 +123,9 @@ def push(
 ):
     """Overwrite the HuggingFace dataset named in the repo's sweb.yaml.
 
+    An eval.yaml in the repo root, or eval/<dataset>.yaml when the repo publishes
+    several datasets, is uploaded alongside the rows as the dataset's eval.yaml.
+
     [yellow][bold]Examples:[/bold][/yellow]
 
         swebench dataset push ~/swe-bench-multilingual-tasks --dry-run
