@@ -75,6 +75,38 @@ def compile_datasets(
     }
 
 
+def _write_split(frame, path: Path) -> None:
+    """Write one split, typing empty asset lists as strings.
+
+    Every list in a column can be empty in one split and not in another -- only one
+    multimodal instance has patch assets, and it is deprecated -- and arrow then types
+    the column `list<null>` here and `list<string>` elsewhere, which makes the two
+    splits disagree and fails a schema check on the hub.
+    """
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    table = pa.Table.from_pandas(frame, preserve_index=False)
+    assets = "image_assets"
+    if assets in table.schema.names:
+        field = table.schema.field(assets)
+        if pa.types.is_struct(field.type):
+            fixed = pa.struct(
+                [
+                    pa.field(f.name, pa.list_(pa.string()))
+                    if pa.types.is_list(f.type) and pa.types.is_null(f.type.value_type)
+                    else f
+                    for f in field.type
+                ]
+            )
+            if fixed != field.type:
+                i = table.schema.get_field_index(assets)
+                table = table.set_column(
+                    i, pa.field(assets, fixed), table.column(assets).cast(fixed)
+                )
+    pq.write_table(table, path)
+
+
 def write_parquets(
     repo_path: str | Path, out_dir: str | Path, datasets: list[str] | None = None
 ) -> dict[str, Path]:
@@ -87,7 +119,7 @@ def write_parquets(
         out.mkdir(parents=True, exist_ok=True)
         for split, rows in by_split.items():
             path = out / f"{split}.parquet"
-            pd.DataFrame(rows).to_parquet(path, index=False)
+            _write_split(pd.DataFrame(rows), path)
             written[f"{dataset}/{split}"] = path
         card = eval_config(repo_path, dataset)
         if card:

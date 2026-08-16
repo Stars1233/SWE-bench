@@ -199,3 +199,33 @@ def test_an_eval_card_naming_no_dataset_is_reported(tmp_path):
     assert any("is not published" in p.message for p in problems)
     # a stray card breaks nothing that runs, so it does not block a push
     assert errors(problems) == []
+
+
+def test_empty_asset_lists_are_typed_as_strings(tmp_path):
+    """Otherwise arrow types the column list<null> and the splits disagree.
+
+    Only one multimodal instance has patch assets and it is deprecated, so the
+    published splits would carry a null-typed column that changes type the moment
+    a real one ships.
+    """
+    import pyarrow.parquet as pq
+
+    from swebench.task.publish import write_parquets
+
+    repo = _repo(tmp_path, splits=("dev", "test"))
+    for iid, split in (("a__a-1", "test"), ("b__b-2", "dev")):
+        _task(repo, iid, split=split)
+        meta = yaml.safe_load((repo / "tasks" / iid / "task.yaml").read_text())
+        meta["image_assets"] = {"patch": [], "problem_statement": []}
+        (repo / "tasks" / iid / "task.yaml").write_text(yaml.safe_dump(meta))
+
+    written = write_parquets(tmp_path, tmp_path / "out")
+    types = {
+        split: pq.read_table(p).schema.field("image_assets").type
+        for split, p in ((k.rsplit("/", 1)[1], v) for k, v in written.items())
+        if str(p).endswith(".parquet")
+    }
+    assert len(types) == 2
+    for t in types.values():
+        assert all("null" not in str(f.type) for f in t)
+    assert len(set(map(str, types.values()))) == 1, "splits must share one schema"
