@@ -34,10 +34,23 @@ class EvaluationError(Exception):
         )
 
 
-def get_predictions_from_file(predictions_path: str, dataset_name: str, split: str):
+def get_predictions_from_file(
+    predictions_path: str,
+    dataset_name: str,
+    split: str,
+    task_repo: str | None = None,
+):
     if predictions_path == "gold":
         print("Using gold predictions - ignoring predictions_path")
-        dataset = load_swebench_dataset(dataset_name, split)
+        # the gold patch has to come from wherever the rest of the instance came from,
+        # or a run against a task repo silently grades the dataset's patch instead and
+        # never notices the two disagreeing
+        if task_repo:
+            from swebench.task.repo import load_task_repo
+
+            dataset = load_task_repo(task_repo)
+        else:
+            dataset = load_swebench_dataset(dataset_name, split)
         return [
             {
                 "instance_id": datum["instance_id"],

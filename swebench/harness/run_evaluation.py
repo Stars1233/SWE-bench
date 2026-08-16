@@ -706,7 +706,9 @@ def main(
             report_dir.mkdir(parents=True)
 
     # load predictions as map of instance_id to prediction
-    predictions = get_predictions_from_file(predictions_path, dataset_name, split)
+    predictions = get_predictions_from_file(
+        predictions_path, dataset_name, split, task_repo
+    )
     predictions = {pred["instance_id"]: pred for pred in predictions}
     write_run_metadata(run_id, dataset_name, split, task_repo)
 
