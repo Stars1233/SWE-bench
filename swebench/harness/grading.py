@@ -24,16 +24,20 @@ from swebench.harness.log_parsers import PARSER_REGISTRY
 
 # Evidence that a test runner actually executed, used to tell "ran with no failures"
 # apart from "never ran" when the parsed status map is empty
+# Every count here must be non-zero. A runner that starts and immediately loses the
+# browser still prints its summary -- karma logs "Executed 0 of 0" -- and under
+# EvalType.FAIL_ONLY an empty status map scores every F2P test as passing, so a zero
+# count read as evidence turns a suite that never ran into a resolved instance.
 SUITE_RAN = re.compile(
-    r"Executed \d+ of \d+"
-    r"|TOTAL: \d+ (?:SUCCESS|FAILED)"
-    r"|\d+ passing"
-    r"|Tests:\s+\d+"
-    r"|Test Suites:"
-    r"|^# tests \d+"
+    r"Executed [1-9]\d* of \d+"
+    r"|TOTAL: [1-9]\d* (?:SUCCESS|FAILED)"
+    r"|[1-9]\d* passing"
+    r"|Tests:\s+[1-9]\d*"
+    r"|Test Suites:\s+(?:\d+ \w+, )*[1-9]\d* total"
+    r"|^# tests [1-9]\d*"
     # jasmine (marked) prints only this line on a clean run; its parser records
     # failures only, so without it an all-passing suite looks like it never ran
-    r"|\d+ specs?, \d+ failures?"
+    r"|[1-9]\d* specs?, \d+ failures?"
     # openlayers' rendering harness logs "<case>': ok" per passing case at
     # --log-level info; it records no failures otherwise, so this is the only
     # positive evidence a silent (all-passing) run actually executed

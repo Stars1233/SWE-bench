@@ -130,4 +130,7 @@ def report_command(
         rewrite_reports=True,
         modal=False,
         report_dir=report_dir,
+        # a run made against a task repo has to be re-graded against the same tests,
+        # or the dataset's copy silently overrides them and the verdict changes
+        task_repo=recorded.get("task_repo"),
     )

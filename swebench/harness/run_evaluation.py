@@ -487,6 +487,10 @@ def write_run_metadata(
     """
     path = RUN_EVALUATION_LOG_DIR / run_id / LOG_RUN_METADATA
     path.parent.mkdir(parents=True, exist_ok=True)
+    # a re-grade passes no task repo, and overwriting the recorded one with null
+    # loses the only record of which tests the run was graded against
+    if task_repo is None and path.is_file():
+        task_repo = json.loads(path.read_text()).get("task_repo")
     path.write_text(
         json.dumps(
             {
@@ -736,7 +740,9 @@ def main(
         print("No instances to run.")
         return make_run_report(predictions, full_dataset, run_id, client, report_dir)
     else:
-        if task_repo:
+        # a re-grade reads existing logs and starts no container, so building the
+        # images it names would cost hours and change nothing
+        if task_repo and not rewrite_reports:
             _build_before_eval(
                 dataset, dataset_name, split, task_repo, max_workers, client
             )

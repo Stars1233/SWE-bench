@@ -105,3 +105,31 @@ def test_a_suite_that_never_started_is_still_rejected(tmp_path):
         _spec(log_parser="parse_log_marked", eval_type="fail_only"), str(log)
     )
     assert not found
+
+
+def test_a_zero_count_summary_is_not_evidence_the_suite_ran(tmp_path):
+    """karma prints "Executed 0 of 0" when it loses the browser before any test.
+
+    Under fail_only an empty status map scores every F2P test as passing, so
+    accepting a zero count resolves an instance whose suite never ran --
+    chartjs__Chart.js-9678 passed 24/24 this way with no tests executed.
+    """
+    log = tmp_path / "test_output.txt"
+    log.write_text(
+        f"{START_TEST_OUTPUT}\nChrome 120: Executed 0 of 0 DISCONNECTED\n{END_TEST_OUTPUT}\n"
+    )
+    sm, found = get_logs_eval(
+        _spec(log_parser="parse_log_chart_js", eval_type="fail_only"), str(log)
+    )
+    assert not found
+
+
+def test_a_real_karma_run_is_still_evidence(tmp_path):
+    log = tmp_path / "test_output.txt"
+    log.write_text(
+        f"{START_TEST_OUTPUT}\nChrome 120: Executed 294 of 1293 SUCCESS\n{END_TEST_OUTPUT}\n"
+    )
+    sm, found = get_logs_eval(
+        _spec(log_parser="parse_log_chart_js", eval_type="fail_only"), str(log)
+    )
+    assert found and sm == {}
