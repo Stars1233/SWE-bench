@@ -4,7 +4,7 @@ All notable changes to the PyPI package for SWE-bench ([`swebench`](https://pypi
 
 Prior to version 1.1.0, not all deployed versions are listed, as the PyPI package was going through development and testing. The noteworthy versions and the respective changes that were introduced by that version are included. All versions 1.1.0 onwards are fully listed.
 
-## [Unreleased] - 5.0.0rc
+## [5.0.0] - 8/17/2026
 
 Breaking changes:
 * Task repos hold one directory per instance under `tasks/`, and a `sweb.yaml` naming the dataset they publish. Task metadata is split by kind: `task.yaml` for the short fields, `tests.json` for FAIL_TO_PASS and PASS_TO_PASS, `problem_statement.md` and `hints.md` for prose. The harness reads that tree directly: `swebench dataset build|check|diff|push` and `swebench images build|check|push` all take a task repo path as their only argument, so a command can no longer be pointed at one dataset while fed another repo.
