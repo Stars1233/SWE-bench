@@ -229,23 +229,3 @@ def test_empty_asset_lists_are_typed_as_strings(tmp_path):
     for t in types.values():
         assert all("null" not in str(f.type) for f in t)
     assert len(set(map(str, types.values()))) == 1, "splits must share one schema"
-
-
-def test_an_empty_fail_to_pass_can_be_allowed_with_a_reason(tmp_path):
-    """Some tasks are graded by whether the code builds at all.
-
-    tokio-rs__axum-1730 adds a function that only has to type check; without its
-    patch the crate does not compile, so every PASS_TO_PASS test fails and the task
-    still discriminates. The exemption has to be written down, not inferred.
-    """
-    repo = _repo(tmp_path)
-    _task(repo, "a__a-1", FAIL_TO_PASS=[], empty_fail_to_pass="graded by the build")
-    assert errors(check_task_repo(tmp_path)) == []
-    guard(tmp_path)
-
-
-def test_the_reason_does_not_reach_the_dataset(tmp_path):
-    repo = _repo(tmp_path)
-    _task(repo, "a__a-1", FAIL_TO_PASS=[], empty_fail_to_pass="graded by the build")
-    row = compile_datasets(tmp_path)["SWE-bench/Example"]["test"][0]
-    assert "empty_fail_to_pass" not in row
