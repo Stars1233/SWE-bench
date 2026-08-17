@@ -316,8 +316,10 @@ def run_instance_modal(
         # pylint hack
         if "pylint" in test_spec.instance_id:
             run_command += " && PYTHONPATH="
-        # increase recursion limit for testing
-        run_command += " && python3 -c 'import sys; sys.setrecursionlimit(10000)'"
+        # a `python3 -c 'sys.setrecursionlimit(...)'` step used to sit here, meaning to
+        # give the tests more stack. It set the limit in its own process and exited, so
+        # the eval script below never saw it -- it only looked like the local runs
+        # differed from Modal. Removed rather than left as decoration.
         # run eval script
         run_command += " && /bin/bash /root/eval.sh"
         test_output, returncode = runner.exec(run_command)

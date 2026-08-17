@@ -698,6 +698,16 @@ def main(
             "You may also use sb-cli (https://github.com/swe-bench/sb-cli/) to submit predictions to the hosted evaluation."
         )
 
+    # Modal builds its own images remotely, so a task repo's Dockerfiles would be
+    # ignored while its tests were used -- the run would report on a tree it never
+    # built. Refused here, before any work, rather than silently proving the wrong thing.
+    if modal and task_repo:
+        raise ValueError(
+            "--modal cannot build from a task repo: it builds images remotely, so the "
+            "repo's Dockerfiles would be ignored while its tests were used. Drop "
+            "--task-repo to run on Modal, or drop --modal to build the repo."
+        )
+
     # set open file limit
     assert len(run_id) > 0, "Run ID must be provided"
     if report_dir is not None:
