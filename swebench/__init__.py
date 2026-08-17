@@ -1,4 +1,4 @@
-__version__ = "5.0.0rc"
+__version__ = "5.0.0"
 
 # Imported on first use, not at import time: eagerly importing these pulled in bs4,
 # docker, datasets and modal, so `import swebench` cost seconds and failed outright
