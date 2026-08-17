@@ -515,10 +515,28 @@ def read_run_metadata(run_id: str) -> dict | None:
 def load_instances(
     dataset_name: str, split: str, instance_ids: list | None, task_repo: str | None
 ) -> list:
-    """Instances come from the task repo when one is given, else from the dataset."""
-    if task_repo:
-        return load_task_repo(task_repo, instance_ids)
-    return load_swebench_dataset(dataset_name, split, instance_ids)
+    """Instances come from the task repo when one is given, else from the dataset.
+
+    A dataset is already one split; a task repo holds every split at once, so the
+    split has to be applied here or a run picks up whatever else is in the tree --
+    the multimodal repo would evaluate its dev and deprecated tasks alongside test.
+
+    Named ids are honoured from any split, matching `select_tasks`: an instance
+    being repaired can be run by name while it sits in an unpublished split.
+    """
+    if not task_repo:
+        return load_swebench_dataset(dataset_name, split, instance_ids)
+    tasks = load_task_repo(task_repo, instance_ids)
+    if instance_ids:
+        return tasks
+    wanted = [task for task in tasks if task.get("split") == split]
+    if not wanted:
+        available = sorted({task["split"] for task in tasks if task.get("split")})
+        raise ValueError(
+            f"{task_repo} has no tasks in split {split!r}. "
+            f"It has: {' '.join(available) or 'none'}"
+        )
+    return wanted
 
 
 def get_dataset_from_preds(
@@ -632,7 +650,7 @@ def _build_before_eval(dataset, dataset_name, split, task_repo, max_workers, cli
     from swebench.image_builder.docker_build import build_instance_images
     from swebench.image_builder.image_spec import get_image_specs_from_dataset
     from swebench.image_builder.prepare_images import resolve_task_repo
-    from swebench.task.repo import load_dockerfiles
+    from swebench.task.repo import load_dockerfiles, task_paths
 
     wanted = {d["instance_id"]: make_test_spec(d).image for d in dataset}
     # namespace and tag come from the image the dataset names, so built tags match
@@ -643,16 +661,19 @@ def _build_before_eval(dataset, dataset_name, split, task_repo, max_workers, cli
     print(f"Building {len(wanted)} image(s) from {task_repo} before evaluating...")
     with resolve_task_repo(task_repo) as repo_path:
         dockerfiles = load_dockerfiles(repo_path, list(wanted))
-    image_specs = get_image_specs_from_dataset(dataset, dockerfiles, namespace, tag)
-    if not image_specs:
-        print("No Dockerfiles matched these instances; nothing was built.")
-    else:
-        build_instance_images(
-            client=client,
-            image_specs=image_specs,
-            force_rebuild=True,
-            max_workers=max_workers,
+        contexts = task_paths(repo_path, list(wanted))
+        image_specs = get_image_specs_from_dataset(
+            dataset, dockerfiles, namespace, tag, contexts
         )
+        if not image_specs:
+            print("No Dockerfiles matched these instances; nothing was built.")
+        else:
+            build_instance_images(
+                client=client,
+                image_specs=image_specs,
+                force_rebuild=True,
+                max_workers=max_workers,
+            )
 
     # trust the registry only where a build did not produce the image
     missing = []

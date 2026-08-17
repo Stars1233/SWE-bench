@@ -82,7 +82,7 @@ def build_image(
 
             if nocache:
                 cmd.append("--no-cache")
-            cmd.append(str(dockerfile_path.parent))
+            cmd.append(str(image_spec.context_dir or dockerfile_path.parent))
 
             logger.info(f"Executing: {' '.join(cmd)}")
 

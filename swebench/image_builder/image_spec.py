@@ -18,6 +18,7 @@ class ImageSpec:
     namespace: Optional[str]
     tag: str = "latest"
     arch: str = "amd64"
+    context_dir: Optional[str] = None
 
     def __post_init__(self):
         """Validate the dataclass fields after initialization."""
@@ -67,6 +68,7 @@ def get_image_specs_from_dataset(
     dockerfiles: dict[str, str],
     namespace: Optional[str] = None,
     tag: str = "latest",
+    context_dirs: Optional[dict] = None,
 ) -> list[ImageSpec]:
     """
     Idempotent function that converts a list of SWEbenchInstance objects to a list of ImageSpec objects.
@@ -76,11 +78,19 @@ def get_image_specs_from_dataset(
         dockerfiles: Dict mapping instance_id to Dockerfile content.
         namespace: Docker registry namespace.
         tag: Docker image tag.
+        context_dirs: Dict mapping instance_id to its build context directory.
     """
     if isinstance(dataset[0], ImageSpec):
         return cast(list[ImageSpec], dataset)
+    context_dirs = context_dirs or {}
     return [
-        make_image_spec(x, dockerfiles[x["instance_id"]], namespace, tag)
+        make_image_spec(
+            x,
+            dockerfiles[x["instance_id"]],
+            namespace,
+            tag,
+            context_dirs.get(x["instance_id"]),
+        )
         for x in cast(list[SWEbenchInstance], dataset)
     ]
 
@@ -90,6 +100,7 @@ def make_image_spec(
     dockerfile: str,
     namespace: Optional[str] = None,
     tag: str = "latest",
+    context_dir: Optional[str] = None,
 ) -> ImageSpec:
     """
     Create an ImageSpec from a SWEbenchInstance for image building purposes.
@@ -99,6 +110,7 @@ def make_image_spec(
         dockerfile: Dockerfile content string (pre-generated).
         namespace: Docker registry namespace.
         tag: Docker image tag.
+        context_dir: Directory to build in, when the Dockerfile COPYs from it.
     """
     if isinstance(instance, ImageSpec):
         return instance
@@ -109,4 +121,5 @@ def make_image_spec(
         dockerfile=dockerfile,
         namespace=namespace,
         tag=tag,
+        context_dir=str(context_dir) if context_dir else None,
     )

@@ -147,3 +147,45 @@ def test_unpublished_splits_stay_out_of_the_dataset(tmp_path):
     assert "deprecated" not in grouped
     # still present in the tree, so it can be built by id
     assert len(load_task_repo(tmp_path)) == 2
+
+
+def test_a_task_repo_run_is_scoped_to_its_split(tmp_path):
+    """A dataset is one split already; a task repo holds them all at once.
+
+    Without this the multimodal repo evaluates its dev and deprecated tasks
+    alongside test, which quietly changes what a `--gold` run reports.
+    """
+    from swebench.harness.run_evaluation import load_instances
+
+    _config(tmp_path, splits=("dev", "test"))
+    _task(tmp_path, "a__a-1", split="test")
+    _task(tmp_path, "b__b-2", split="dev")
+    _task(tmp_path, "c__c-3", split="deprecated")
+
+    got = load_instances("unused", "test", None, str(tmp_path))
+    assert [i["instance_id"] for i in got] == ["a__a-1"]
+    got = load_instances("unused", "dev", None, str(tmp_path))
+    assert [i["instance_id"] for i in got] == ["b__b-2"]
+
+
+def test_named_ids_are_honoured_from_any_split(tmp_path):
+    """An instance under repair can be run by name from an unpublished split."""
+    from swebench.harness.run_evaluation import load_instances
+
+    _config(tmp_path, splits=("test",))
+    _task(tmp_path, "a__a-1", split="test")
+    _task(tmp_path, "c__c-3", split="deprecated")
+
+    got = load_instances("unused", "test", ["c__c-3"], str(tmp_path))
+    assert [i["instance_id"] for i in got] == ["c__c-3"]
+
+
+def test_an_empty_split_names_what_the_repo_holds(tmp_path):
+    """A silently empty run looks like a pass, so it has to be an error."""
+    from swebench.harness.run_evaluation import load_instances
+
+    _config(tmp_path, splits=("test",))
+    _task(tmp_path, "a__a-1", split="py_noop")
+
+    with pytest.raises(ValueError, match="no tasks in split 'test'.*py_noop"):
+        load_instances("unused", "test", None, str(tmp_path))

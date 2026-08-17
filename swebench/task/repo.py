@@ -148,6 +148,22 @@ def load_dockerfiles(
     return {d.name: (d / "Dockerfile").read_text() for d in dirs}
 
 
+def task_paths(
+    repo_path: str | Path, instance_ids: list[str] | None = None
+) -> dict[str, Path]:
+    """instance_id -> its task directory, which is its Dockerfile's build context.
+
+    A Dockerfile in a task repo can `COPY` from its own task directory, so a task
+    that needs a file at build time -- a patch too large to inline, say -- can
+    carry it next to the Dockerfile that reads it.
+    """
+    dirs = task_dirs(repo_path)
+    if instance_ids is not None:
+        wanted = set(instance_ids)
+        dirs = [d for d in dirs if d.name in wanted]
+    return {d.name: d for d in dirs}
+
+
 def asset_path(repo_path: str | Path, instance_id: str, path: str) -> Path:
     """Where a staged asset lives: tasks/<id>/test_assets/<path in the repo>."""
     return tasks_root(repo_path) / instance_id / ASSETS_SUBDIR / path

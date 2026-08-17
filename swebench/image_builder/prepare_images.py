@@ -13,7 +13,7 @@ from swebench.image_builder.docker_build import build_instance_images
 from swebench.image_builder.docker_utils import list_images
 from swebench.harness.utils import optional_str, str2bool
 from swebench.task.publish import guard
-from swebench.task.repo import load_dockerfiles, select_tasks
+from swebench.task.repo import load_dockerfiles, select_tasks, task_paths
 
 
 def _is_github_ref(task_repo: str) -> bool:
@@ -134,27 +134,30 @@ def main(
     with resolve_task_repo(task_repo) as repo_path:
         guard(repo_path)
         dataset = select_tasks(repo_path, instance_ids, datasets)
-        dockerfiles = load_dockerfiles(repo_path, [i["instance_id"] for i in dataset])
-    image_specs = get_image_specs_from_dataset(dataset, dockerfiles, namespace, tag)
-    image_specs = filter_image_specs(image_specs, client, force_rebuild)
-
-    if len(image_specs) == 0:
-        print("All images exist. Nothing left to build.")
-        return 0
-
-    if dry_run:
-        print(
-            f"DRY RUN MODE: Creating build contexts for {len(image_specs)} images (no actual builds will be performed)"
+        ids = [i["instance_id"] for i in dataset]
+        dockerfiles = load_dockerfiles(repo_path, ids)
+        image_specs = get_image_specs_from_dataset(
+            dataset, dockerfiles, namespace, tag, task_paths(repo_path, ids)
         )
+        image_specs = filter_image_specs(image_specs, client, force_rebuild)
 
-    # Build images for remaining instances
-    successful, failed = build_instance_images(
-        client=client,
-        image_specs=image_specs,
-        force_rebuild=force_rebuild,
-        max_workers=max_workers,
-        dry_run=dry_run,
-    )
+        if len(image_specs) == 0:
+            print("All images exist. Nothing left to build.")
+            return 0
+
+        if dry_run:
+            print(
+                f"DRY RUN MODE: Creating build contexts for {len(image_specs)} images (no actual builds will be performed)"
+            )
+
+        # Build images for remaining instances
+        successful, failed = build_instance_images(
+            client=client,
+            image_specs=image_specs,
+            force_rebuild=force_rebuild,
+            max_workers=max_workers,
+            dry_run=dry_run,
+        )
     if dry_run:
         print(f"Successfully created build contexts for {len(successful)} images")
         if len(failed) > 0:
