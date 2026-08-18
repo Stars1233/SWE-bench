@@ -39,6 +39,7 @@ def get_predictions_from_file(
     dataset_name: str,
     split: str,
     task_repo: str | None = None,
+    instance_ids: list | None = None,
 ):
     if predictions_path == "gold":
         print("Using gold predictions - ignoring predictions_path")
@@ -48,9 +49,11 @@ def get_predictions_from_file(
         if task_repo:
             from swebench.task.repo import load_task_repo
 
-            dataset = load_task_repo(task_repo)
+            dataset = load_task_repo(task_repo, instance_ids)
+            if not instance_ids:
+                dataset = [d for d in dataset if d.get("split") == split]
         else:
-            dataset = load_swebench_dataset(dataset_name, split)
+            dataset = load_swebench_dataset(dataset_name, split, instance_ids)
         return [
             {
                 "instance_id": datum["instance_id"],
