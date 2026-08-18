@@ -53,7 +53,7 @@ def test_without_a_task_repo_the_dataset_is_used(monkeypatch):
     """Omitting --task-repo keeps the published dataset as the source."""
     called = {}
 
-    def fake_load(dataset_name, split):
+    def fake_load(dataset_name, split, instance_ids=None):
         called["args"] = (dataset_name, split)
         return [{"instance_id": "a__a-1", "patch": "diff --git a/from b/hub\n"}]
 
