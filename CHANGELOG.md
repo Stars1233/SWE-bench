@@ -4,6 +4,11 @@ All notable changes to the PyPI package for SWE-bench ([`swebench`](https://pypi
 
 Prior to version 1.1.0, not all deployed versions are listed, as the PyPI package was going through development and testing. The noteworthy versions and the respective changes that were introduced by that version are included. All versions 1.1.0 onwards are fully listed.
 
+## [5.0.1] - 8/17/2026
+
+Fixed:
+* A task's Dockerfile can `COPY` from its own `tasks/<instance_id>/` directory, so a task that needs a file at build time can carry it next to the Dockerfile that reads it. `ImageSpec` gained a `context_dir`, and `swebench.task.repo.task_paths` maps each instance to its build context.
+
 ## [5.0.0] - 8/17/2026
 
 Breaking changes:
